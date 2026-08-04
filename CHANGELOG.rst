@@ -5,6 +5,15 @@ Change Log
 Unreleased
 ----------
 
+* EDL-5: Create-user endpoint (``POST /edl-panel/api/v1/users/``). Reuses the
+  platform's ``do_create_account`` atomically; duplicate email/username return
+  inline field errors (409) with no partial account. Password provisioning
+  follows ``EDL_PANEL_PASSWORD_MODE``: ``link`` (default) creates an
+  unusable-password account and emails a set-password link; ``copy`` sets a
+  generated password, activates the account and returns it once. Platform
+  calls are isolated behind ``edxapp.py`` so the suite runs standalone. Writes
+  a create_user audit entry.
+
 * EDL-3: Audit log. Adds the append-only ``EdlAdminAuditLog`` model (actor,
   action, target, course, detail, timestamp), a ``record_action`` helper that
   also emits an ``eventtracking`` event (best-effort), and a read-only Django

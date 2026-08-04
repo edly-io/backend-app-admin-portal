@@ -3,6 +3,7 @@ from django.http import HttpResponse
 from django.views import View
 
 from edl_panel import __version__
+from edl_panel.permissions import EdlAdminRequiredMixin
 
 _LANDING_HTML = """<!doctype html>
 <html lang="en">
@@ -30,13 +31,13 @@ _LANDING_HTML = """<!doctype html>
 </html>"""
 
 
-class PanelIndexView(View):
+class PanelIndexView(EdlAdminRequiredMixin, View):
     """
     Landing page at ``/edl-panel/``.
 
-    Placeholder that confirms the panel is mounted; this is the entry point the
-    Admin MFE will render into. Access control (the EDL-admin gate) is added in
-    EDL-2 — for now the page is a public, static placeholder.
+    Gated to EDL admins (EDL-2): anonymous users are redirected to login and
+    authenticated non-admins get a 403. This is the entry point the Admin MFE
+    will render into.
     """
 
     def get(self, request):  # noqa: D102

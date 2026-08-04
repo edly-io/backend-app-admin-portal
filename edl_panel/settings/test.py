@@ -9,8 +9,14 @@ SECRET_KEY = 'edl-panel-test-secret-key'
 INSTALLED_APPS = [
     'django.contrib.auth',
     'django.contrib.contenttypes',
+    'django.contrib.sessions',
     'rest_framework',
     'edl_panel',
+]
+
+MIDDLEWARE = [
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
 ]
 
 DATABASES = {
@@ -28,3 +34,4 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Plugin defaults (mirrors common.plugin_settings for the standalone suite).
 EDL_PANEL_ADMIN_GROUP = 'edl_admin'
 EDL_PANEL_PASSWORD_MODE = 'link'
+EDL_PANEL_SUPERUSER_BYPASS = True

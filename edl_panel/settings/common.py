@@ -13,6 +13,9 @@ def plugin_settings(settings):
     # gate (EDL-2) checks membership of this group.
     settings.EDL_PANEL_ADMIN_GROUP = 'edl_admin'
 
+    # When True, Django superusers bypass the EDL-admin group check.
+    settings.EDL_PANEL_SUPERUSER_BYPASS = True
+
     # Password provisioning mode for admin-created accounts (EDL-4/EDL-5):
     #   'link'  -> create with an unusable password and email a set-password link
     #   'copy'  -> generate a password and surface it once to the admin

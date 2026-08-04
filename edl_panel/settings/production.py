@@ -16,3 +16,6 @@ def plugin_settings(settings):
     settings.EDL_PANEL_PASSWORD_MODE = env_tokens.get(
         'EDL_PANEL_PASSWORD_MODE', settings.EDL_PANEL_PASSWORD_MODE,
     )
+    settings.EDL_PANEL_SUPERUSER_BYPASS = env_tokens.get(
+        'EDL_PANEL_SUPERUSER_BYPASS', settings.EDL_PANEL_SUPERUSER_BYPASS,
+    )

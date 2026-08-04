@@ -1,4 +1,4 @@
-"""Tests for the edl_panel scaffold (EDL-1): landing page + health endpoint."""
+"""Tests for the public health endpoint (EDL-1)."""
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -6,20 +6,8 @@ from rest_framework.test import APITestCase
 from edl_panel import __version__
 
 
-class PanelIndexTests(APITestCase):
-    """The panel landing page is reachable at /edl-panel/."""
-
-    def test_index_reachable(self):
-        response = self.client.get(reverse('edl_panel:index'))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertContains(response, 'EDL Panel')
-
-    def test_index_url_is_edl_panel_root(self):
-        self.assertEqual(reverse('edl_panel:index'), '/edl-panel/')
-
-
 class HealthViewTests(APITestCase):
-    """The health endpoint proves the plugin's API URLs are mounted."""
+    """The health endpoint is public and proves the API URLs are mounted."""
 
     def test_health_returns_ok(self):
         response = self.client.get(reverse('edl_panel:v1:health'))

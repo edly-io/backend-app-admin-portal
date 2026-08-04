@@ -87,6 +87,36 @@ def course_exists(course_key):
         return False
 
 
+def get_course(course_key):
+    """Return the course object for ``course_key`` (raises if absent)."""
+    from openedx.core.lib.courses import get_course_by_id
+    return get_course_by_id(course_key)
+
+
+def allow_course_role(course, user, level):
+    """Grant a course-scoped role via the platform's ``allow_access`` (EDL-10)."""
+    from lms.djangoapps.instructor.access import allow_access
+    allow_access(course, user, level, send_email=False)
+
+
+def revoke_course_role(course, user, level):
+    """Revoke a course-scoped role via the platform's ``revoke_access`` (EDL-10)."""
+    from lms.djangoapps.instructor.access import revoke_access
+    revoke_access(course, user, level, send_email=False)
+
+
+def is_enrolled(user, course_key):
+    """True if ``user`` has an active enrollment in ``course_key``."""
+    from common.djangoapps.student.models import CourseEnrollment
+    return CourseEnrollment.is_enrolled(user, course_key)
+
+
+def enroll_user(user, course_key):
+    """Enroll ``user`` in ``course_key`` (used to auto-enroll on role grant)."""
+    from common.djangoapps.student.models import CourseEnrollment
+    return CourseEnrollment.enroll(user, course_key)
+
+
 def process_enrollment_batch(*, request_user, course_key, action, identifiers,
                              auto_enroll, email_students, reason, secure):
     """

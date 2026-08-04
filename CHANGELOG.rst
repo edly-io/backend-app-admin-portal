@@ -5,6 +5,14 @@ Change Log
 Unreleased
 ----------
 
+* EDL-10: Course-scoped role management (``GET/POST /edl-panel/api/v1/roles/``).
+  GET returns the grantable-role catalog (Course Admin / Course Staff / Limited
+  Staff) with one-line descriptions. POST grants/revokes via ``allow_access`` /
+  ``revoke_access`` behind an allow-list — global/site roles are not grantable.
+  Granting mirrors the dashboard: the target must be active (409 otherwise) and
+  is auto-enrolled if not already enrolled. Writes a role_grant/role_revoke
+  audit entry.
+
 * EDL-8 / EDL-9: Enroll and unenroll endpoints
   (``POST /edl-panel/api/v1/enrollments/enroll/`` and ``.../unenroll/``).
   Enroll or unenroll one or many identifiers (email or username) into a

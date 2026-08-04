@@ -13,4 +13,5 @@ urlpatterns = [
     path('users/<str:username>/reactivate/', views.ReactivateUserView.as_view(), name='user-reactivate'),
     path('enrollments/enroll/', views.EnrollView.as_view(), name='enroll'),
     path('enrollments/unenroll/', views.UnenrollView.as_view(), name='unenroll'),
+    path('roles/', views.RolesView.as_view(), name='roles'),
 ]

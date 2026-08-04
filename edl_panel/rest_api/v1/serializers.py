@@ -2,6 +2,7 @@
 from rest_framework import serializers
 
 from edl_panel.directory import STATUS_CHOICES
+from edl_panel.roles import ACTION_ALLOW, ACTION_REVOKE, GRANTABLE_ROLES
 
 
 class CreateUserSerializer(serializers.Serializer):
@@ -30,3 +31,12 @@ class EnrollmentSerializer(serializers.Serializer):
     email_students = serializers.BooleanField(default=False)
     auto_enroll = serializers.BooleanField(default=False)
     reason = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class RoleActionSerializer(serializers.Serializer):
+    """Input for granting/revoking a course-scoped role."""
+
+    course_id = serializers.CharField()
+    identifier = serializers.CharField(help_text='Email or username.')
+    role = serializers.ChoiceField(choices=list(GRANTABLE_ROLES))
+    action = serializers.ChoiceField(choices=[ACTION_ALLOW, ACTION_REVOKE])

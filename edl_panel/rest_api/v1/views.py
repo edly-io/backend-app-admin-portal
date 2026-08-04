@@ -16,8 +16,10 @@ from edl_panel.rest_api.base import EdlPanelAPIView
 from edl_panel.rest_api.v1.serializers import (
     CreateUserSerializer,
     EnrollmentSerializer,
+    RoleActionSerializer,
     UserListQuerySerializer,
 )
+from edl_panel.roles import ACTION_ALLOW, RoleActionError, change_course_role, role_catalog
 from edl_panel.standing import UserNotFound, set_account_disabled
 
 
@@ -210,3 +212,50 @@ class UnenrollView(_EnrollmentActionView):
 
     enroll_action = ACTION_UNENROLL
     audit_action = EdlAdminAuditLog.Action.UNENROLL
+
+
+class RolesView(EdlPanelAPIView):
+    """
+    Course-scoped role management (EDL-10).
+
+    ``GET``  — the catalog of grantable roles with one-line descriptions.
+    ``POST`` — grant or revoke a role for a user in a course. Global/site roles
+    are not grantable; grants require an active user and auto-enroll the grantee.
+    """
+
+    def get(self, request):  # noqa: D102
+        return Response({'roles': role_catalog()}, status=status.HTTP_200_OK)
+
+    def post(self, request):  # noqa: D102
+        serializer = RoleActionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        try:
+            user = change_course_role(
+                actor=request.user,
+                course_id=data['course_id'],
+                identifier=data['identifier'],
+                role=data['role'],
+                action=data['action'],
+            )
+        except RoleActionError as exc:
+            return Response(exc.field_errors, status=exc.status_code)
+
+        is_grant = data['action'] == ACTION_ALLOW
+        record_action(
+            request.user,
+            EdlAdminAuditLog.Action.ROLE_GRANT if is_grant else EdlAdminAuditLog.Action.ROLE_REVOKE,
+            target_user=user,
+            course_id=data['course_id'],
+            detail={'role': data['role']},
+        )
+        return Response(
+            {
+                'username': user.username,
+                'role': data['role'],
+                'action': data['action'],
+            },
+            status=status.HTTP_200_OK,
+        )

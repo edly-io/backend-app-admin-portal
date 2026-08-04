@@ -5,6 +5,13 @@ Change Log
 Unreleased
 ----------
 
+* EDL-6: User directory (``GET /edl-panel/api/v1/users/``). Paginated
+  list with partial search over username/email (and ``UserProfile.name``
+  in-platform) and a ``pending``/``active``/``disabled`` status filter. Status
+  derives from ``is_active`` + ``UserStanding``. Platform-only relations engage
+  via capability checks so the endpoint runs standalone. (The core account API
+  only does exact-match lookups, so this is net-new query logic.)
+
 * EDL-5: Create-user endpoint (``POST /edl-panel/api/v1/users/``). Reuses the
   platform's ``do_create_account`` atomically; duplicate email/username return
   inline field errors (409) with no partial account. Password provisioning

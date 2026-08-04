@@ -1,6 +1,7 @@
 """v1 API views for the edl_panel plugin."""
 from django.conf import settings
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,9 +9,18 @@ from rest_framework.views import APIView
 from edl_panel import __version__
 from edl_panel.accounts import CreateUserError, create_learner
 from edl_panel.audit import record_action
+from edl_panel.directory import list_users, serialize_user
 from edl_panel.models import EdlAdminAuditLog
 from edl_panel.rest_api.base import EdlPanelAPIView
-from edl_panel.rest_api.v1.serializers import CreateUserSerializer
+from edl_panel.rest_api.v1.serializers import CreateUserSerializer, UserListQuerySerializer
+
+
+class UserListPagination(PageNumberPagination):
+    """Page-number pagination for the user directory."""
+
+    page_size = 25
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 class HealthView(APIView):
@@ -51,15 +61,27 @@ class MeView(EdlPanelAPIView):
         )
 
 
-class CreateUserView(EdlPanelAPIView):
+class UsersView(EdlPanelAPIView):
     """
-    Create a single learner/staff account.
+    User directory.
 
-    Reuses the platform's ``do_create_account``; provisions the password per
-    ``EDL_PANEL_PASSWORD_MODE`` (``link`` default, ``copy`` optional).
-    Duplicate email/username are returned as inline field errors (409) with no
-    partial account created.
+    ``GET``  — list/search/filter users (partial email/name/username search and
+    pending/active/disabled status), paginated.
+    ``POST`` — create a single learner/staff account (see below).
     """
+
+    def get(self, request):  # noqa: D102
+        query = UserListQuerySerializer(data=request.query_params)
+        if not query.is_valid():
+            return Response(query.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = list_users(
+            search=query.validated_data.get('search', ''),
+            status=query.validated_data.get('status'),
+        )
+        paginator = UserListPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        return paginator.get_paginated_response([serialize_user(u) for u in page])
 
     def post(self, request):  # noqa: D102
         serializer = CreateUserSerializer(data=request.data)

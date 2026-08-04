@@ -8,5 +8,5 @@ app_name = 'v1'
 urlpatterns = [
     path('health/', views.HealthView.as_view(), name='health'),
     path('me/', views.MeView.as_view(), name='me'),
-    path('users/', views.CreateUserView.as_view(), name='users'),
+    path('users/', views.UsersView.as_view(), name='users'),
 ]

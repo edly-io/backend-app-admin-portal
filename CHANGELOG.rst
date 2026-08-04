@@ -5,6 +5,21 @@ Change Log
 Unreleased
 ----------
 
+* EDL-8 / EDL-9: Enroll and unenroll endpoints
+  (``POST /edl-panel/api/v1/enrollments/enroll/`` and ``.../unenroll/``).
+  Enroll or unenroll one or many identifiers (email or username) into a
+  published course run, reusing the platform's
+  ``process_student_enrollment_batch`` (notification-email toggle,
+  ``CourseEnrollmentAllowed`` for pending users, soft data-retaining unenroll,
+  per-student ``ManualEnrollmentAudit``). Validates the course run and
+  identifiers; writes a summary audit entry.
+
+* EDL-7: Deactivate/reactivate endpoints
+  (``POST /edl-panel/api/v1/users/<username>/deactivate|reactivate/``). Sets
+  ``UserStanding`` so login/course access is blocked while enrollments,
+  submissions and grades are retained (not retirement). 404 for unknown user;
+  writes an audit entry.
+
 * EDL-6: User directory (``GET /edl-panel/api/v1/users/``). Paginated
   list with partial search over username/email (and ``UserProfile.name``
   in-platform) and a ``pending``/``active``/``disabled`` status filter. Status

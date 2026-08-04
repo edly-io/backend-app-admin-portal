@@ -10,9 +10,15 @@ from edl_panel import __version__
 from edl_panel.accounts import CreateUserError, create_learner
 from edl_panel.audit import record_action
 from edl_panel.directory import list_users, serialize_user
+from edl_panel.enrollment import ACTION_ENROLL, ACTION_UNENROLL, EnrollmentError, update_enrollments
 from edl_panel.models import EdlAdminAuditLog
 from edl_panel.rest_api.base import EdlPanelAPIView
-from edl_panel.rest_api.v1.serializers import CreateUserSerializer, UserListQuerySerializer
+from edl_panel.rest_api.v1.serializers import (
+    CreateUserSerializer,
+    EnrollmentSerializer,
+    UserListQuerySerializer,
+)
+from edl_panel.standing import UserNotFound, set_account_disabled
 
 
 class UserListPagination(PageNumberPagination):
@@ -116,3 +122,91 @@ class UsersView(EdlPanelAPIView):
         if password:
             body['password'] = password
         return Response(body, status=status.HTTP_201_CREATED)
+
+
+class _SetStandingView(EdlPanelAPIView):
+    """Base for deactivate/reactivate; subclasses set ``disabled`` + ``action``."""
+
+    disabled = None
+    action = None
+
+    def post(self, request, username):  # noqa: D102
+        try:
+            user = set_account_disabled(actor=request.user, username=username, disabled=self.disabled)
+        except UserNotFound:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        record_action(request.user, self.action, target_user=user)
+        return Response(
+            {'username': user.username, 'is_disabled': self.disabled},
+            status=status.HTTP_200_OK,
+        )
+
+
+class DeactivateUserView(_SetStandingView):
+    """Block login and course access while retaining enrollments/grades."""
+
+    disabled = True
+    action = EdlAdminAuditLog.Action.DEACTIVATE_USER
+
+
+class ReactivateUserView(_SetStandingView):
+    """Restore access for a previously deactivated account."""
+
+    disabled = False
+    action = EdlAdminAuditLog.Action.REACTIVATE_USER
+
+
+class _EnrollmentActionView(EdlPanelAPIView):
+    """Base for enroll/unenroll; subclasses set ``enroll_action`` + ``audit_action``."""
+
+    enroll_action = None
+    audit_action = None
+
+    def post(self, request):  # noqa: D102
+        serializer = EnrollmentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        try:
+            result = update_enrollments(
+                actor=request.user,
+                request=request,
+                course_id=data['course_id'],
+                identifiers=data['identifiers'],
+                action=self.enroll_action,
+                email_students=data['email_students'],
+                auto_enroll=data['auto_enroll'],
+                reason=data.get('reason', ''),
+            )
+        except EnrollmentError as exc:
+            return Response(exc.field_errors, status=exc.status_code)
+
+        record_action(
+            request.user,
+            self.audit_action,
+            course_id=data['course_id'],
+            detail={
+                'identifiers': result.get('total_students'),
+                'successful': result.get('successful_operations'),
+                'failed': result.get('failed_operations'),
+                'email_students': data['email_students'],
+                'auto_enroll': data['auto_enroll'],
+            },
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class EnrollView(_EnrollmentActionView):
+    """Enroll one or many learners into a published course run."""
+
+    enroll_action = ACTION_ENROLL
+    audit_action = EdlAdminAuditLog.Action.ENROLL
+
+
+class UnenrollView(_EnrollmentActionView):
+    """Unenroll one or many learners (soft; submission/grade data retained)."""
+
+    enroll_action = ACTION_UNENROLL
+    audit_action = EdlAdminAuditLog.Action.UNENROLL

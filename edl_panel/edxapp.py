@@ -44,3 +44,68 @@ def send_set_password_email(user, request=None):
         send_password_reset_email_for_user,
     )
     return send_password_reset_email_for_user(user, request)
+
+
+def set_user_standing(user, disabled, changed_by):
+    """
+    Disable or re-enable an account via ``UserStanding`` (EDL-7).
+
+    Mirrors the platform's ``disable_account_ajax``: disabled accounts are
+    blocked by ``UserStandingMiddleware`` while enrollments, submissions and
+    grades are retained. Returns the resulting standing status string.
+    """
+    from common.djangoapps.student.models import UserStanding
+    status = UserStanding.ACCOUNT_DISABLED if disabled else UserStanding.ACCOUNT_ENABLED
+    standing, _created = UserStanding.objects.get_or_create(
+        user=user, defaults={'account_status': status, 'changed_by': changed_by},
+    )
+    standing.account_status = status
+    standing.changed_by = changed_by
+    standing.save()
+    return status
+
+
+def parse_course_key(course_id):
+    """Parse a course-id string into a CourseKey (raises on malformed input)."""
+    from opaque_keys.edx.keys import CourseKey
+    return CourseKey.from_string(course_id)
+
+
+def split_identifiers(raw):
+    """Split a comma/newline-separated identifier string (platform helper)."""
+    from lms.djangoapps.instructor.views.api import _split_input_list
+    return _split_input_list(raw)
+
+
+def course_exists(course_key):
+    """True if the (published) course run exists in the LMS modulestore."""
+    from openedx.core.lib.courses import get_course_by_id
+    try:
+        get_course_by_id(course_key)
+        return True
+    except Exception:  # noqa: BLE001 - Http404/ValueError when absent
+        return False
+
+
+def process_enrollment_batch(*, request_user, course_key, action, identifiers,
+                             auto_enroll, email_students, reason, secure):
+    """
+    Enroll/unenroll a batch of identifiers via the platform helper (EDL-8/9).
+
+    Reuses ``process_student_enrollment_batch`` which resolves each identifier
+    (email or username), toggles the notification email, creates
+    ``CourseEnrollmentAllowed`` for not-yet-registered emails on enroll, does a
+    soft (data-retaining) unenroll, and writes ``ManualEnrollmentAudit`` per
+    student. Returns the platform's per-identifier results dict.
+    """
+    from lms.djangoapps.instructor.utils import process_student_enrollment_batch
+    return process_student_enrollment_batch(
+        request_user=request_user,
+        course_key=course_key,
+        action=action,
+        identifiers=identifiers,
+        auto_enroll=auto_enroll,
+        email_students=email_students,
+        reason=reason,
+        secure=secure,
+    )

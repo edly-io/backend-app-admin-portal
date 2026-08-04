@@ -17,3 +17,16 @@ class UserListQuerySerializer(serializers.Serializer):
 
     search = serializers.CharField(required=False, allow_blank=True, default='')
     status = serializers.ChoiceField(choices=STATUS_CHOICES, required=False)
+
+
+class EnrollmentSerializer(serializers.Serializer):
+    """Input for enroll/unenroll of one or many identifiers into a course run."""
+
+    course_id = serializers.CharField()
+    identifiers = serializers.ListField(
+        child=serializers.CharField(), allow_empty=False,
+        help_text='Emails or usernames.',
+    )
+    email_students = serializers.BooleanField(default=False)
+    auto_enroll = serializers.BooleanField(default=False)
+    reason = serializers.CharField(required=False, allow_blank=True, default='')

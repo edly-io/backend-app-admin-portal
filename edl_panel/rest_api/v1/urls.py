@@ -9,4 +9,8 @@ urlpatterns = [
     path('health/', views.HealthView.as_view(), name='health'),
     path('me/', views.MeView.as_view(), name='me'),
     path('users/', views.UsersView.as_view(), name='users'),
+    path('users/<str:username>/deactivate/', views.DeactivateUserView.as_view(), name='user-deactivate'),
+    path('users/<str:username>/reactivate/', views.ReactivateUserView.as_view(), name='user-reactivate'),
+    path('enrollments/enroll/', views.EnrollView.as_view(), name='enroll'),
+    path('enrollments/unenroll/', views.UnenrollView.as_view(), name='unenroll'),
 ]

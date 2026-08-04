@@ -1,0 +1,4 @@
+# Test/dev dependencies for edl-panel.
+-r base.in
+pytest
+pytest-django

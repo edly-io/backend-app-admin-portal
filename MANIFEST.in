@@ -1,0 +1,5 @@
+include README.rst
+include CHANGELOG.rst
+include LICENSE
+recursive-include edl_panel *.html *.txt *.po *.mo
+recursive-include requirements *.in

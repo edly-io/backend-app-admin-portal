@@ -5,6 +5,12 @@ Change Log
 Unreleased
 ----------
 
+* EDL-3: Audit log. Adds the append-only ``EdlAdminAuditLog`` model (actor,
+  action, target, course, detail, timestamp), a ``record_action`` helper that
+  also emits an ``eventtracking`` event (best-effort), and a read-only Django
+  admin. Enrollment actions continue to reuse the platform's own
+  ``ManualEnrollmentAudit``.
+
 * EDL-2: EDL-admin access gate. Adds the ``edl_admin`` Django group (via data
   migration), an ``IsEdlAdmin`` DRF permission + ``EdlPanelAPIView`` base, and
   an ``EdlAdminRequiredMixin`` for the browser landing page. Non-admins get a

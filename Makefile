@@ -15,5 +15,5 @@ test:  ## Run the test suite
 	pytest
 
 quality:  ## Run linters
-	isort --check-only edl_panel
-	pylint edl_panel || true
+	isort --check-only admin_portal
+	pylint admin_portal || true

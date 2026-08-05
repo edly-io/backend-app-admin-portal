@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Package metadata for edl-panel."""
+"""Package metadata for admin-portal."""
 import os
 import re
 
@@ -32,11 +32,11 @@ def load_requirements(*paths):
     return requirements
 
 
-VERSION = get_version('edl_panel', '__init__.py')
+VERSION = get_version('admin_portal', '__init__.py')
 README = open(os.path.join(os.path.dirname(__file__), 'README.rst'), encoding='utf-8').read()
 
 setup(
-    name='edl-panel',
+    name='admin-portal',
     version=VERSION,
     author='EDL Platform',
     description='EDL self-serve admin panel: user and course enrollment management for Open edX.',
@@ -52,7 +52,7 @@ setup(
         'Natural Language :: English',
     ],
     packages=find_packages(
-        include=['edl_panel', 'edl_panel.*'],
+        include=['admin_portal', 'admin_portal.*'],
         exclude=['*tests'],
     ),
     include_package_data=True,
@@ -61,7 +61,7 @@ setup(
     zip_safe=False,
     entry_points={
         'lms.djangoapp': [
-            'edl_panel = edl_panel.apps:EdlPanelConfig',
+            'admin_portal = admin_portal.apps:AdminPortalConfig',
         ],
     },
 )

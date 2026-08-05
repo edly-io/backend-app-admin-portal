@@ -1,5 +1,5 @@
 include README.rst
 include CHANGELOG.rst
 include LICENSE
-recursive-include edl_panel *.html *.txt *.po *.mo
+recursive-include admin_portal *.html *.txt *.po *.mo
 recursive-include requirements *.in

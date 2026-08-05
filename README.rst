@@ -1,13 +1,13 @@
 =========
-edl-panel
+admin-portal
 =========
 
 EDL self-serve admin panel for **user and course enrollment management** on
 Open edX. Packaged as an ``lms.djangoapp`` plugin: install it into the LMS and
-it auto-registers at ``/edl-panel/``:
+it auto-registers at ``/admin-portal/``:
 
-* ``/edl-panel/``            — browser-facing panel (Admin MFE mount point)
-* ``/edl-panel/api/v1/``     — REST API the panel consumes
+* ``/admin-portal/``            — browser-facing panel (Admin MFE mount point)
+* ``/admin-portal/api/v1/``     — REST API the panel consumes
 
 A separate Admin MFE (frontend) renders into the landing route; this
 repository is the backend plugin only.
@@ -35,7 +35,7 @@ Installation
 
 .. code-block:: bash
 
-    pip install -e /path/to/edl-panel
+    pip install -e /path/to/admin-portal
 
 Inside a Tutor deployment, add the package as a private requirement and rebuild
 the ``openedx`` image, then restart the LMS.
@@ -45,12 +45,12 @@ Verify it loaded
 
 .. code-block:: bash
 
-    ./manage.py lms print_setting INSTALLED_APPS | grep edl_panel
-    curl -sS https://<lms-host>/edl-panel/api/v1/health/
+    ./manage.py lms print_setting INSTALLED_APPS | grep admin_portal
+    curl -sS https://<lms-host>/admin-portal/api/v1/health/
 
 Expected response::
 
-    {"status": "ok", "service": "edl-panel", "version": "0.1.0"}
+    {"status": "ok", "service": "admin-portal", "version": "0.1.0"}
 
 Development
 ===========
@@ -66,32 +66,32 @@ Run the standalone test suite (outside edx-platform):
 Configuration
 =============
 
-``EDL_PANEL_ADMIN_GROUP`` (default ``edl_admin``)
+``ADMIN_PORTAL_ADMIN_GROUP`` (default ``edl_admin``)
     Django group whose members are treated as EDL admins.
 
-``EDL_PANEL_PASSWORD_MODE`` (default ``link``)
+``ADMIN_PORTAL_PASSWORD_MODE`` (default ``link``)
     ``link`` emails a set-password link on account creation; ``copy`` generates
     a password surfaced once to the admin.
 
-``EDL_PANEL_SUPERUSER_BYPASS`` (default ``True``)
+``ADMIN_PORTAL_SUPERUSER_BYPASS`` (default ``True``)
     When ``True``, Django superusers pass the access gate without being in the
     admin group.
 
 API reference
 =============
 
-Base URL: ``/edl-panel/api/v1/``. All paths below are relative to it.
+Base URL: ``/admin-portal/api/v1/``. All paths below are relative to it.
 
 Authentication & access
 ------------------------
 
 Every endpoint except ``health/`` requires an authenticated request **and**
-membership of the EDL-admin group (``EDL_PANEL_ADMIN_GROUP``); superusers pass
-when ``EDL_PANEL_SUPERUSER_BYPASS`` is on. Authenticate with a JWT
+membership of the EDL-admin group (``ADMIN_PORTAL_ADMIN_GROUP``); superusers pass
+when ``ADMIN_PORTAL_SUPERUSER_BYPASS`` is on. Authenticate with a JWT
 (``Authorization: JWT <token>``) or a logged-in session.
 
 * Not an EDL admin (or anonymous) → ``403`` on API routes.
-* The browser landing page ``/edl-panel/`` redirects anonymous users to login
+* The browser landing page ``/admin-portal/`` redirects anonymous users to login
   and returns ``403`` for authenticated non-admins.
 
 Validation errors use DRF's field-keyed shape, e.g.
@@ -104,11 +104,11 @@ health
 
 .. code-block:: bash
 
-    curl -sS https://<lms>/edl-panel/api/v1/health/
+    curl -sS https://<lms>/admin-portal/api/v1/health/
 
 ::
 
-    200  {"status": "ok", "service": "edl-panel", "version": "0.1.0"}
+    200  {"status": "ok", "service": "admin-portal", "version": "0.1.0"}
 
 me
 --
@@ -133,7 +133,7 @@ Query params:
 
 .. code-block:: bash
 
-    curl -sS "https://<lms>/edl-panel/api/v1/users/?search=ali&status=active" \
+    curl -sS "https://<lms>/admin-portal/api/v1/users/?search=ali&status=active" \
          -H "Authorization: JWT <token>"
 
 ::
@@ -157,7 +157,7 @@ Create user
 
 .. code-block:: bash
 
-    curl -sS -X POST https://<lms>/edl-panel/api/v1/users/ \
+    curl -sS -X POST https://<lms>/admin-portal/api/v1/users/ \
          -H "Authorization: JWT <token>" -H "Content-Type: application/json" \
          -d '{"username": "learner1", "email": "learner1@example.com", "name": "Learner One"}'
 
@@ -168,7 +168,7 @@ Create user
 
   A set-password link is emailed; the admin never sees a password.
 
-* ``201`` copy mode (``EDL_PANEL_PASSWORD_MODE=copy``) — adds a one-time
+* ``201`` copy mode (``ADMIN_PORTAL_PASSWORD_MODE=copy``) — adds a one-time
   ``"password"`` field and the account is ``active``.
 * ``409`` duplicate — ``{"username": ["..."]}`` or ``{"email": ["..."]}``;
   no partial account is created.
@@ -201,7 +201,7 @@ Enroll / unenroll
 
 .. code-block:: bash
 
-    curl -sS -X POST https://<lms>/edl-panel/api/v1/enrollments/enroll/ \
+    curl -sS -X POST https://<lms>/admin-portal/api/v1/enrollments/enroll/ \
          -H "Authorization: JWT <token>" -H "Content-Type: application/json" \
          -d '{"course_id": "course-v1:Org+Course+Run",
               "identifiers": ["a@example.com", "bob"],
@@ -241,7 +241,7 @@ or username), ``role`` (one of the catalog keys), ``action``
 
 .. code-block:: bash
 
-    curl -sS -X POST https://<lms>/edl-panel/api/v1/roles/ \
+    curl -sS -X POST https://<lms>/admin-portal/api/v1/roles/ \
          -H "Authorization: JWT <token>" -H "Content-Type: application/json" \
          -d '{"course_id": "course-v1:Org+Course+Run",
               "identifier": "bob", "role": "staff", "action": "allow"}'
@@ -261,7 +261,7 @@ Audit
 
 Every create, deactivate/reactivate, enroll/unenroll and role change writes an
 ``EdlAdminAuditLog`` row (actor, action, target, course, timestamp) and emits
-an ``edl_panel.<action>`` tracking event. Enrollment actions additionally leave
+an ``admin_portal.<action>`` tracking event. Enrollment actions additionally leave
 the platform's own ``ManualEnrollmentAudit``. The audit log is browsable
 read-only in Django admin.
 

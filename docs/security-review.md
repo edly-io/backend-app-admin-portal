@@ -1,7 +1,7 @@
-# Security Review — edl-panel
+# Security Review — admin-portal
 
-**Scope:** the `edl-panel` LMS plugin (REST API + Django landing) and the
-`admin-portal` MFE (`frontend-app-edl-panel`).
+**Scope:** the `admin-portal` LMS plugin (REST API + Django landing) and the
+`admin-portal` MFE (`frontend-app-admin-portal`).
 **Method:** manual code review of every endpoint, the permission gate, input
 handling, sensitive-data flows, privilege boundaries, and the MFE.
 **Verdict:** No high/critical findings. Posture is strong (admin-gated, ORM-only,
@@ -10,14 +10,14 @@ in this pass (see *Fixes applied*).
 
 ## Authentication & authorization
 
-- **Every feature endpoint is gated.** All views extend `EdlPanelAPIView`
+- **Every feature endpoint is gated.** All views extend `AdminPortalAPIView`
   (`IsAuthenticated` + `IsEdlAdmin`); verified route-by-route in
   `rest_api/v1/urls.py`. Only `GET /health/` is public (liveness, returns no
   data). ✅
 - Anonymous → **401**; authenticated non-admin → **403**. The Django landing
   page (`PanelIndexView`) is gated by `EdlAdminRequiredMixin` (anonymous →
   login redirect, non-admin → 403). ✅
-- `EDL_PANEL_SUPERUSER_BYPASS` (default `True`) lets superusers pass the group
+- `ADMIN_PORTAL_SUPERUSER_BYPASS` (default `True`) lets superusers pass the group
   check — documented; set `False` for strict group-only access. ⚠️ (config)
 
 ## Privilege escalation (the key control)
@@ -80,7 +80,7 @@ in this pass (see *Fixes applied*).
   admin-gated). Use edx-platform's ratelimit or an upstream WAF.
 - **Security headers / CSP** for the Django landing page — best handled at the
   proxy (platform-wide).
-- Choose `EDL_PANEL_SUPERUSER_BYPASS` per environment.
+- Choose `ADMIN_PORTAL_SUPERUSER_BYPASS` per environment.
 - Confirm `UserStandingMiddleware` is enabled — deactivation enforcement
   depends on it.
 - Define an audit-log **retention** policy.

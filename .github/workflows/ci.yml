@@ -29,7 +29,7 @@ jobs:
           pip install -e .
 
       - name: Check for missing migrations
-        run: python -m django makemigrations --check --dry-run edl_panel --settings=edl_panel.settings.test
+        run: python -m django makemigrations --check --dry-run admin_portal --settings=admin_portal.settings.test
 
       - name: Run tests
         run: pytest

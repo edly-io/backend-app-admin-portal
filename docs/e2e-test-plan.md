@@ -1,13 +1,13 @@
-# End-to-End Test Plan — edl-panel (backend ↔ admin-portal MFE)
+# End-to-End Test Plan — admin-portal (backend ↔ admin-portal MFE)
 
-Exercises the full stack: the `admin-portal` MFE → JWT → the gated `edl-panel`
+Exercises the full stack: the `admin-portal` MFE → JWT → the gated `admin-portal`
 REST API → edx-platform → DB, against a **running** platform. Each case maps to
 an acceptance criterion.
 
 ## Prerequisites
 
 - Platform up (`tutor local start -d`); `admin-portal` MFE built.
-- URLs: LMS `http://local.openedx.io`, MFE `http://apps.local.openedx.io/admin-portal/`, API base `http://local.openedx.io/edl-panel/api/v1/`.
+- URLs: LMS `http://local.openedx.io`, MFE `http://apps.local.openedx.io/admin-portal/`, API base `http://local.openedx.io/admin-portal/api/v1/`.
 - Accounts: one **EDL admin** (member of `edl_admin`, or a superuser) and one
   **non-admin** learner.
 - A **published** course run id for the enrollment cases.
@@ -16,9 +16,9 @@ an acceptance criterion.
 
 ```bash
 # Public health
-curl -sS http://local.openedx.io/edl-panel/api/v1/health/           # -> {"status":"ok",...}
+curl -sS http://local.openedx.io/admin-portal/api/v1/health/           # -> {"status":"ok",...}
 # Gate: unauthenticated -> 401
-curl -sS -o /dev/null -w "%{http_code}\n" http://local.openedx.io/edl-panel/api/v1/me/   # -> 401
+curl -sS -o /dev/null -w "%{http_code}\n" http://local.openedx.io/admin-portal/api/v1/me/   # -> 401
 ```
 
 ## UI cases
@@ -30,7 +30,7 @@ curl -sS -o /dev/null -w "%{http_code}\n" http://local.openedx.io/edl-panel/api/
 | 3 | **Gate — admin** | Log in as EDL admin; open `/admin-portal/` | Users table loads; header nav shows Users / Enrollment / Staff |
 | 4 | **Create — link mode** (L1) | Users → Create user; fill username/email/name; submit | 201; "created", status *pending*; **set-password link emailed** (check `tutor local logs lms`/SMTP); learner receives link, sets password, can log in |
 | 5 | **Duplicate rejected** (L2) | Create user with an existing email/username | Inline field error (409); **no partial account** (re-list shows none created) |
-| 6 | **Create — copy mode** (L1) | Set `EDL_PANEL_PASSWORD_MODE=copy`, rebuild; create user | 201, status *active*, one-time password shown once; login works with it |
+| 6 | **Create — copy mode** (L1) | Set `ADMIN_PORTAL_PASSWORD_MODE=copy`, rebuild; create user | 201, status *active*, one-time password shown once; login works with it |
 | 7 | **List / search / filter** (L4) | Type in search; change status filter; paginate | Results match; badges Active/Pending/Disabled |
 | 8 | **Deactivate** (L5) | Row → Deactivate → confirm | User blocked from LMS login/courses; **enrollments & grades retained** (verify in Django admin); audit entry written |
 | 9 | **Reactivate** (L5) | Row → Reactivate | Login restored |
@@ -48,7 +48,7 @@ non-admins (#1–2); duplicates leave no partial account (#5); deactivate/unenro
 
 ## Automating this (recommended next)
 
-Add Cypress to `frontend-app-edl-panel` (`docs` + `cypress/e2e/*.cy.js`) driving
+Add Cypress to `frontend-app-admin-portal` (`docs` + `cypress/e2e/*.cy.js`) driving
 cases #1–13 against a deployed instance, with a session-bootstrap login step, run
 nightly in CI. The API-level checks above can also run as a lightweight
 authenticated smoke job. (Not committed here — needs a live target + test creds.)

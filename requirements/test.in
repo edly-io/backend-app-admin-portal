@@ -1,4 +1,4 @@
-# Test/dev dependencies for edl-panel.
+# Test/dev dependencies for admin-portal.
 -r base.in
 pytest
 pytest-django

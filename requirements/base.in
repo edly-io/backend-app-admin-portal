@@ -1,5 +1,5 @@
 # Core runtime dependencies for edl-panel.
-# These are already provided by edx-platform at runtime; pinned loosely here
-# so the plugin can be installed and tested standalone.
-Django
+# These are already provided by edx-platform at runtime; constrained here so the
+# plugin installs and tests deterministically standalone (matches platform's Django 4.2).
+Django>=4.2,<5
 djangorestframework

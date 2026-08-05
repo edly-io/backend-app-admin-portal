@@ -23,14 +23,15 @@ class UserListQuerySerializer(serializers.Serializer):
 class EnrollmentSerializer(serializers.Serializer):
     """Input for enroll/unenroll of one or many identifiers into a course run."""
 
-    course_id = serializers.CharField()
+    course_id = serializers.CharField(max_length=255)
     identifiers = serializers.ListField(
-        child=serializers.CharField(), allow_empty=False,
+        # Cap the batch to bound work per request (DoS guard).
+        child=serializers.CharField(max_length=254), allow_empty=False, max_length=1000,
         help_text='Emails or usernames.',
     )
     email_students = serializers.BooleanField(default=False)
     auto_enroll = serializers.BooleanField(default=False)
-    reason = serializers.CharField(required=False, allow_blank=True, default='')
+    reason = serializers.CharField(required=False, allow_blank=True, default='', max_length=1000)
 
 
 class RoleActionSerializer(serializers.Serializer):

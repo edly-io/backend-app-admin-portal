@@ -1,10 +1,10 @@
 """Enrollment service for the admin_portal plugin (EDL-8 enroll / EDL-9 unenroll).
 
-Thin wrapper over the platform's ``process_student_enrollment_batch``: validates
-the course run and identifiers, then delegates. The core helper handles
-identifier resolution, the notification-email toggle, ``CourseEnrollmentAllowed``
-for pending users, soft (data-retaining) unenroll, and per-student
-``ManualEnrollmentAudit`` rows.
+Validates the course run and identifiers, then delegates to
+``edxapp.process_enrollment_batch``, which loops over the platform's stable
+enroll/unenroll primitives: identifier resolution, the notification-email
+toggle, ``CourseEnrollmentAllowed`` for pending users, soft (data-retaining)
+unenroll, and per-student ``ManualEnrollmentAudit`` rows.
 """
 from admin_portal import edxapp
 
@@ -32,7 +32,7 @@ def update_enrollments(*, actor, request, course_id, identifiers, action,
     """
     Enroll or unenroll ``identifiers`` in ``course_id``.
 
-    Returns the platform batch-result dict. Raises :class:`EnrollmentError`
+    Returns the per-identifier batch-result dict. Raises :class:`EnrollmentError`
     (400/404) for a malformed/unknown course or empty identifier list.
     """
     try:

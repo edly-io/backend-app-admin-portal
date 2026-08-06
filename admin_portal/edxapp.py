@@ -120,22 +120,155 @@ def enroll_user(user, course_key):
 def process_enrollment_batch(*, request_user, course_key, action, identifiers,
                              auto_enroll, email_students, reason, secure):
     """
-    Enroll/unenroll a batch of identifiers via the platform helper (EDL-8/9).
+    Enroll/unenroll a batch of identifiers (EDL-8/9).
 
-    Reuses ``process_student_enrollment_batch`` which resolves each identifier
-    (email or username), toggles the notification email, creates
-    ``CourseEnrollmentAllowed`` for not-yet-registered emails on enroll, does a
-    soft (data-retaining) unenroll, and writes ``ManualEnrollmentAudit`` per
-    student. Returns the platform's per-identifier results dict.
+    This deliberately does NOT use ``lms.djangoapps.instructor.utils.
+    process_student_enrollment_batch``: that helper was only added upstream in
+    PR #37216 and is absent from the Open edX release this plugin targets
+    (importing it raises ``ModuleNotFoundError`` at runtime). Instead we build
+    on the long-stable primitives ``enroll_email`` / ``unenroll_email`` /
+    ``get_email_params`` + ``ManualEnrollmentAudit`` — the same ones the
+    instructor bulk-enroll endpoint uses — so this works across versions.
+
+    For each identifier it resolves the user (email or username), toggles the
+    notification email, creates ``CourseEnrollmentAllowed`` for not-yet-
+    registered emails on enroll, does a soft (data-retaining) unenroll, and
+    writes one ``ManualEnrollmentAudit`` row. Returns a per-identifier results
+    dict: ``{action, auto_enroll, results, successful_operations,
+    failed_operations, total_students}``.
     """
-    from lms.djangoapps.instructor.utils import process_student_enrollment_batch
-    return process_student_enrollment_batch(
-        request_user=request_user,
-        course_key=course_key,
-        action=action,
-        identifiers=identifiers,
-        auto_enroll=auto_enroll,
-        email_students=email_students,
-        reason=reason,
-        secure=secure,
+    import logging
+
+    from django.contrib.auth import get_user_model
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+    from django.db import transaction
+
+    from common.djangoapps.student.models import (
+        ALLOWEDTOENROLL_TO_ENROLLED,
+        ALLOWEDTOENROLL_TO_UNENROLLED,
+        DEFAULT_TRANSITION_STATE,
+        ENROLLED_TO_ENROLLED,
+        ENROLLED_TO_UNENROLLED,
+        UNENROLLED_TO_ALLOWEDTOENROLL,
+        UNENROLLED_TO_ENROLLED,
+        UNENROLLED_TO_UNENROLLED,
+        CourseEnrollment,
+        EnrollStatusChange,
+        ManualEnrollmentAudit,
+        get_user_by_username_or_email,
     )
+    from lms.djangoapps.instructor.enrollment import (
+        enroll_email,
+        get_email_params,
+        get_user_email_language,
+        unenroll_email,
+    )
+    from openedx.core.lib.courses import get_course_by_id
+
+    log = logging.getLogger(__name__)
+    User = get_user_model()
+
+    def _enroll_transition(before, after):
+        if not before['user']:
+            return UNENROLLED_TO_ALLOWEDTOENROLL if after['allowed'] else DEFAULT_TRANSITION_STATE
+        if after['enrollment']:
+            if before['enrollment']:
+                return ENROLLED_TO_ENROLLED
+            if before['allowed']:
+                return ALLOWEDTOENROLL_TO_ENROLLED
+            return UNENROLLED_TO_ENROLLED
+        return DEFAULT_TRANSITION_STATE
+
+    def _unenroll_transition(before):
+        if before['enrollment']:
+            return ENROLLED_TO_UNENROLLED
+        if before['allowed']:
+            return ALLOWEDTOENROLL_TO_UNENROLLED
+        return UNENROLLED_TO_UNENROLLED
+
+    def _process_single(identifier):
+        enrollment_obj = None
+        language = None
+        try:
+            identified_user = get_user_by_username_or_email(identifier)
+        except User.DoesNotExist:
+            email = identifier
+        else:
+            email = identified_user.email
+            language = get_user_email_language(identified_user)
+
+        try:
+            validate_email(email)  # raises ValidationError for a bad address
+            # Enrollment + audit are all-or-nothing.
+            with transaction.atomic():
+                if action == EnrollStatusChange.enroll:
+                    before, after, enrollment_obj = enroll_email(
+                        course_key, email, auto_enroll, email_students, dict(email_params), language=language,
+                    )
+                    before_state, after_state = before.to_dict(), after.to_dict()
+                    state_transition = _enroll_transition(before_state, after_state)
+                elif action == EnrollStatusChange.unenroll:
+                    before, after = unenroll_email(
+                        course_key, email, email_students, dict(email_params), language=language,
+                    )
+                    before_state, after_state = before.to_dict(), after.to_dict()
+                    state_transition = _unenroll_transition(before_state)
+                    enrollment_obj = (
+                        CourseEnrollment.get_enrollment(identified_user, course_key)
+                        if identified_user else None
+                    )
+                else:
+                    raise ValueError(f'Unknown enrollment action: {action!r}')
+
+                ManualEnrollmentAudit.create_manual_enrollment_audit(
+                    request_user, email, state_transition, reason, enrollment_obj,
+                )
+            return {
+                'identifier': identifier,
+                'before': before_state,
+                'after': after_state,
+                'success': True,
+                'state_transition': state_transition,
+            }
+        except ValidationError:
+            return {
+                'identifier': identifier,
+                'invalidIdentifier': True,
+                'success': False,
+                'error_type': 'invalid_identifier',
+                'error_message': 'Invalid email address.',
+            }
+        except Exception as exc:  # noqa: BLE001 - report per-learner, keep the batch going
+            log.exception('admin_portal enrollment failed for %s: %s', identifier, exc)
+            return {
+                'identifier': identifier,
+                'error': True,
+                'success': False,
+                'error_type': 'general_error',
+                'error_message': 'Something went wrong while processing this learner. Please try again.',
+            }
+
+    email_params = {}
+    if email_students:
+        email_params = get_email_params(get_course_by_id(course_key), auto_enroll, secure=secure)
+
+    results = []
+    successful_operations = 0
+    failed_operations = 0
+    for identifier in identifiers:
+        result = _process_single(identifier)
+        results.append(result)
+        if result['success']:
+            successful_operations += 1
+        else:
+            failed_operations += 1
+
+    return {
+        'action': action,
+        'auto_enroll': auto_enroll,
+        'results': results,
+        'successful_operations': successful_operations,
+        'failed_operations': failed_operations,
+        'total_students': len(identifiers),
+    }

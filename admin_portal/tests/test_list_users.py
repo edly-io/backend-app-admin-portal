@@ -61,10 +61,23 @@ class UserListTests(APITestCase):
         response = self.client.get(self.url, {'search': 'alice'})
         row = response.data['results'][0]
         self.assertEqual(
-            set(row.keys()), {'id', 'username', 'email', 'name', 'is_active', 'status'},
+            set(row.keys()),
+            {'id', 'username', 'email', 'name', 'is_active', 'status', 'lms_role'},
         )
         self.assertEqual(row['username'], 'alice')
         self.assertEqual(row['status'], STATUS_ACTIVE)
+        self.assertEqual(row['lms_role'], 'learner')
+
+    def test_lms_role_reflects_platform_flags(self):
+        staffer = User.objects.create_user('sam', email='sam@e.com', password='pw', is_staff=True)
+        root = User.objects.create_user('root', email='root@e.com', password='pw', is_superuser=True)
+        roles = {
+            r['username']: r['lms_role']
+            for r in self.client.get(self.url).data['results']
+        }
+        self.assertEqual(roles['alice'], 'learner')
+        self.assertEqual(roles[staffer.username], 'staff')
+        self.assertEqual(roles[root.username], 'admin')
 
     def test_search_by_username(self):
         response = self.client.get(self.url, {'search': 'ali'})

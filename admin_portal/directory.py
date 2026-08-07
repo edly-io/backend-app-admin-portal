@@ -97,6 +97,21 @@ def list_users(*, search='', status=None):
     return _apply_status(queryset, status)
 
 
+def derive_lms_role(user):
+    """Coarse platform role for the directory column: admin > staff > learner.
+
+    Mirrors the Django/Open edX global flags — ``is_superuser`` (full admin),
+    ``is_staff`` (global course staff) — and defaults everyone else to
+    ``learner``. This is a platform-wide role, distinct from the course-scoped
+    roles granted on the Staff & roles screen.
+    """
+    if getattr(user, 'is_superuser', False):
+        return 'admin'
+    if getattr(user, 'is_staff', False):
+        return 'staff'
+    return 'learner'
+
+
 def serialize_user(user):
     """Serialize a user row for the directory list."""
     return {
@@ -106,4 +121,5 @@ def serialize_user(user):
         'name': get_profile_name(user),
         'is_active': user.is_active,
         'status': derive_status(user.is_active, get_standing_status(user)),
+        'lms_role': derive_lms_role(user),
     }

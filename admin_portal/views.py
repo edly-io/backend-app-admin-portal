@@ -1,5 +1,7 @@
 """Browser-facing views for the admin_portal plugin."""
+from django.conf import settings
 from django.http import HttpResponse
+from django.shortcuts import redirect
 from django.views import View
 
 from admin_portal import __version__
@@ -10,7 +12,7 @@ _LANDING_HTML = """<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EDL Panel</title>
+  <title>Admin Portal</title>
   <style>
     body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
            margin: 0; display: grid; place-items: center; min-height: 100vh;
@@ -23,7 +25,7 @@ _LANDING_HTML = """<!doctype html>
 </head>
 <body>
   <div class="card">
-    <h1>EDL Panel</h1>
+    <h1>Admin Portal</h1>
     <p>User &amp; course enrollment management</p>
     <p>Backend v{version} is live. API at <code>/admin-portal/api/v1/</code>.</p>
   </div>
@@ -33,12 +35,30 @@ _LANDING_HTML = """<!doctype html>
 
 class PanelIndexView(EdlAdminRequiredMixin, View):
     """
-    Landing page at ``/admin-portal/``.
+    Landing at ``/admin-portal/`` on the LMS host.
 
     Gated to EDL admins (EDL-2): anonymous users are redirected to login and
-    authenticated non-admins get a 403. This is the entry point the Admin MFE
-    will render into.
+    authenticated non-admins get a 403. The actual admin UI is the Admin Portal
+    MFE on the ``apps.`` host, so for admins we redirect there instead of
+    showing this LMS-host page (which would otherwise be a dead-end placeholder).
+
+    The redirect target is ``ADMIN_PORTAL_MFE_URL`` when set; otherwise we derive
+    ``<scheme>://apps.<lms-host>/admin-portal/`` (the tutor MFE-host convention).
+    The static page below is only a fallback for when the MFE URL cannot be
+    determined (e.g. an unusual host layout with no override configured).
     """
 
     def get(self, request):  # noqa: D102
+        mfe_url = getattr(settings, 'ADMIN_PORTAL_MFE_URL', '') or self._derive_mfe_url(request)
+        if mfe_url:
+            return redirect(mfe_url)
         return HttpResponse(_LANDING_HTML.format(version=__version__))
+
+    @staticmethod
+    def _derive_mfe_url(request):
+        """Best-effort MFE URL from the request host (``apps.<lms-host>/admin-portal/``)."""
+        host = (request.get_host() or '').split(':')[0]
+        if not host or host.startswith('apps.'):
+            return ''  # already on the MFE host, or no usable host — fall back
+        scheme = 'https' if request.is_secure() else 'http'
+        return f'{scheme}://apps.{host}/admin-portal/'

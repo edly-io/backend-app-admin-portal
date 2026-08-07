@@ -20,3 +20,9 @@ def plugin_settings(settings):
     #   'link'  -> create with an unusable password and email a set-password link
     #   'copy'  -> generate a password and surface it once to the admin
     settings.ADMIN_PORTAL_PASSWORD_MODE = 'link'
+
+    # Absolute URL of the Admin Portal MFE. The LMS-host landing page
+    # (``/admin-portal/``) redirects admins here. Leave empty to derive
+    # ``<scheme>://apps.<lms-host>/admin-portal/`` from the request (the tutor
+    # MFE-host convention); set explicitly if the MFE lives elsewhere.
+    settings.ADMIN_PORTAL_MFE_URL = ''

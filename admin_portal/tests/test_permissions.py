@@ -2,6 +2,7 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -68,8 +69,19 @@ class LandingPageGateTests(GateMixin, APITestCase):
         self.client.force_login(self.make_user('bob'))
         self.assertEqual(self.client.get(self.url).status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_admin_is_allowed(self):
+    def test_admin_redirected_to_mfe(self):
         self.client.force_login(self.make_user('alice', admin=True))
         response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertEqual(response['Location'], settings.ADMIN_PORTAL_MFE_URL)
+
+    @override_settings(ADMIN_PORTAL_MFE_URL='')
+    def test_admin_sees_fallback_landing_when_no_mfe_url(self):
+        # With no configured MFE URL and an apps.* host (nothing to derive),
+        # the admin gets the fallback landing — which must carry the current
+        # branding, not the old "EDL Panel".
+        self.client.force_login(self.make_user('alice', admin=True))
+        response = self.client.get(self.url, HTTP_HOST='apps.testserver')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertContains(response, 'EDL Panel')
+        self.assertContains(response, 'Admin Portal')
+        self.assertNotContains(response, 'EDL Panel')

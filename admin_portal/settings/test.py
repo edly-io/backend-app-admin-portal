@@ -6,6 +6,9 @@ platform's settings plus ``common.plugin_settings``.
 
 SECRET_KEY = 'admin-portal-test-secret-key'
 
+# The landing-page tests exercise both the LMS host and the apps.* MFE host.
+ALLOWED_HOSTS = ['testserver', 'apps.testserver']
+
 INSTALLED_APPS = [
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -35,3 +38,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 ADMIN_PORTAL_ADMIN_GROUP = 'edl_admin'
 ADMIN_PORTAL_PASSWORD_MODE = 'link'
 ADMIN_PORTAL_SUPERUSER_BYPASS = True
+# Deterministic MFE redirect target for the landing-page tests.
+ADMIN_PORTAL_MFE_URL = 'http://apps.testserver/admin-portal/'

@@ -85,11 +85,35 @@ class DownloadUrlMatchTests(SimpleTestCase):
             'grade_course', self.ISO, links, 'grade_report', self._abs)
         self.assertIsNone(url)
 
-    def test_no_match_when_minute_differs(self):
+    def test_matches_when_worker_starts_a_few_minutes_after_queueing(self):
+        # The filename timestamp is stamped when the Celery worker starts the
+        # task, not when it was queued (task_created_iso) — a short delay
+        # crossing a minute boundary must still match.
+        links = {'Org_grade_report_2026-05-04-0910.csv': '/media/g.csv'}
+        url = courses_service.find_download_url(
+            'grade_course', self.ISO, links, 'grade_report', self._abs)
+        self.assertEqual(url, 'https://lms.test/media/g.csv')
+
+    def test_no_match_before_task_was_created(self):
+        links = {'Org_grade_report_2026-05-04-0900.csv': '/media/g.csv'}
+        url = courses_service.find_download_url(
+            'grade_course', self.ISO, links, 'grade_report', self._abs)
+        self.assertIsNone(url)
+
+    def test_no_match_beyond_max_queue_delay(self):
         links = {'Org_grade_report_2026-05-04-1010.csv': '/media/g.csv'}
         url = courses_service.find_download_url(
             'grade_course', self.ISO, links, 'grade_report', self._abs)
         self.assertIsNone(url)
+
+    def test_prefers_earliest_match_over_a_later_unrelated_report(self):
+        links = {
+            'Org_grade_report_2026-05-04-0907.csv': '/media/first.csv',
+            'Org_grade_report_2026-05-04-0930.csv': '/media/second.csv',
+        }
+        url = courses_service.find_download_url(
+            'grade_course', self.ISO, links, 'grade_report', self._abs)
+        self.assertEqual(url, 'https://lms.test/media/first.csv')
 
     def test_absolute_url_left_untouched(self):
         links = {'grade_report_2026-05-04-0907.csv': 'https://s3/g.csv'}

@@ -2,6 +2,7 @@
 from rest_framework import serializers
 
 from admin_portal.directory import STATUS_CHOICES
+from admin_portal.reporting import constants as reporting_constants
 from admin_portal.roles import ACTION_ALLOW, ACTION_REVOKE, GRANTABLE_ROLES
 
 
@@ -46,4 +47,6 @@ class RoleActionSerializer(serializers.Serializer):
 class ReportingTrendsQuerySerializer(serializers.Serializer):
     """Query params for the reporting trends endpoint."""
 
-    months = serializers.IntegerField(required=False, min_value=1, max_value=24)
+    months = serializers.IntegerField(
+        required=False, min_value=1, max_value=reporting_constants.MAX_TREND_MONTHS,
+    )

@@ -69,11 +69,13 @@ def _dense_series(counts_by_month, start, now=None):
 
 
 def _service_accounts():
-    """Usernames excluded from learner counts (settings override or default set)."""
-    return frozenset(
-        getattr(settings, "ADMIN_PORTAL_ANALYTICS_SERVICE_ACCOUNTS", None)
-        or constants.DEFAULT_SERVICE_ACCOUNT_USERNAMES
-    )
+    """Usernames excluded from learner counts (settings override or default set).
+
+    ``None`` (unset) falls back to the built-in default set; an explicit ``[]``
+    means "exclude nothing" and must be respected, not treated as unset.
+    """
+    override = getattr(settings, "ADMIN_PORTAL_ANALYTICS_SERVICE_ACCOUNTS", None)
+    return frozenset(override if override is not None else constants.DEFAULT_SERVICE_ACCOUNT_USERNAMES)
 
 
 def get_summary(org=None):

@@ -422,6 +422,7 @@ def reporting_course_rows(*, search, org, ordering, limit, offset, now):
     valid_orderings = {
         'display_name', '-display_name', 'start', '-start', 'end', '-end',
         'enrollment_count', '-enrollment_count', 'org', '-org',
+        'created', '-created',
     }
     queryset = CourseOverview.objects.annotate(
         enrollment_count=Count('courseenrollment', filter=Q(courseenrollment__is_active=True)),
@@ -456,6 +457,7 @@ def reporting_course_rows(*, search, org, ordering, limit, offset, now):
             'unenrolled_count': course.unenrolled_count,
             'start': course.start.isoformat() if course.start else None,
             'end': course.end.isoformat() if course.end else None,
+            'created': course.created.isoformat() if course.created else None,
             'lifecycle_state': state,
         })
     return {'count': total, 'results': rows}

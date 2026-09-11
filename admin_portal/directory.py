@@ -17,7 +17,7 @@ standalone (username/email search + is_active status) and in the LMS (adds
 name search + disabled status).
 """
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.db.models import Count, Q
 
 User = get_user_model()
 
@@ -31,6 +31,7 @@ STATUS_CHOICES = (STATUS_PENDING, STATUS_ACTIVE, STATUS_DISABLED)
 
 _HAS_PROFILE = hasattr(User, 'profile')
 _HAS_STANDING = hasattr(User, 'standing')
+_HAS_ENROLLMENTS = hasattr(User, 'courseenrollment_set')
 
 
 def derive_status(is_active, standing_status):
@@ -92,6 +93,12 @@ def list_users(*, search='', status=None):
         queryset = queryset.select_related('profile')
     if _HAS_STANDING:
         queryset = queryset.select_related('standing')
+    if _HAS_ENROLLMENTS:
+        # One annotate on the (already paginated-before-evaluation) queryset,
+        # rather than a query per row: no N+1 as the directory list grows.
+        queryset = queryset.annotate(
+            enrollment_count=Count('courseenrollment', filter=Q(courseenrollment__is_active=True)),
+        )
     if search:
         queryset = queryset.filter(_search_q(search))
     return _apply_status(queryset, status)
@@ -113,7 +120,11 @@ def derive_lms_role(user):
 
 
 def serialize_user(user):
-    """Serialize a user row for the directory list."""
+    """Serialize a user row for the directory list.
+
+    ``enrollment_count`` is ``None`` when run standalone (no student app, so
+    no ``courseenrollment`` relation to annotate) rather than a misleading 0.
+    """
     return {
         'id': user.id,
         'username': user.username,
@@ -122,4 +133,5 @@ def serialize_user(user):
         'is_active': user.is_active,
         'status': derive_status(user.is_active, get_standing_status(user)),
         'lms_role': derive_lms_role(user),
+        'enrollment_count': getattr(user, 'enrollment_count', None),
     }

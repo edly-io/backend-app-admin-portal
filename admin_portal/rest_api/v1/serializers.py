@@ -41,3 +41,9 @@ class RoleActionSerializer(serializers.Serializer):
     identifier = serializers.CharField(help_text='Email or username.')
     role = serializers.ChoiceField(choices=list(GRANTABLE_ROLES))
     action = serializers.ChoiceField(choices=[ACTION_ALLOW, ACTION_REVOKE])
+
+
+class ReportingTrendsQuerySerializer(serializers.Serializer):
+    """Query params for the reporting trends endpoint."""
+
+    months = serializers.IntegerField(required=False, min_value=1, max_value=24)

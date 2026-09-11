@@ -26,3 +26,12 @@ def plugin_settings(settings):
     # ``<scheme>://apps.<lms-host>/admin-portal/`` from the request (the tutor
     # MFE-host convention); set explicitly if the MFE lives elsewhere.
     settings.ADMIN_PORTAL_MFE_URL = ''
+
+    # Reporting: how long (seconds) analytics payloads are cached server-side.
+    # Analytics is the one place where brief staleness is fine; every response
+    # carries a ``generated_at`` stamp so the UI can show the data's age.
+    settings.ADMIN_PORTAL_REPORTING_CACHE_TTL = 300
+
+    # Usernames excluded from learner counts. ``None`` uses the built-in default
+    # set of service/worker accounts (see reporting.constants).
+    settings.ADMIN_PORTAL_ANALYTICS_SERVICE_ACCOUNTS = None

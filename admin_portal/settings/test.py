@@ -40,3 +40,6 @@ ADMIN_PORTAL_PASSWORD_MODE = 'link'
 ADMIN_PORTAL_SUPERUSER_BYPASS = True
 # Deterministic MFE redirect target for the landing-page tests.
 ADMIN_PORTAL_MFE_URL = 'http://apps.testserver/admin-portal/'
+# Reporting defaults (mirror common.plugin_settings).
+ADMIN_PORTAL_REPORTING_CACHE_TTL = 300
+ADMIN_PORTAL_ANALYTICS_SERVICE_ACCOUNTS = None

@@ -62,11 +62,14 @@ class UserListTests(APITestCase):
         row = response.data['results'][0]
         self.assertEqual(
             set(row.keys()),
-            {'id', 'username', 'email', 'name', 'is_active', 'status', 'lms_role'},
+            {'id', 'username', 'email', 'name', 'is_active', 'status', 'lms_role', 'enrollment_count'},
         )
         self.assertEqual(row['username'], 'alice')
         self.assertEqual(row['status'], STATUS_ACTIVE)
         self.assertEqual(row['lms_role'], 'learner')
+        # No student app installed in the standalone suite -> no
+        # courseenrollment relation to annotate from.
+        self.assertIsNone(row['enrollment_count'])
 
     def test_lms_role_reflects_platform_flags(self):
         staffer = User.objects.create_user('sam', email='sam@e.com', password='pw', is_staff=True)

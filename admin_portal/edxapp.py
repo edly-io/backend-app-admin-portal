@@ -272,3 +272,307 @@ def process_enrollment_batch(*, request_user, course_key, action, identifiers,
         'failed_operations': failed_operations,
         'total_students': len(identifiers),
     }
+
+
+# ---------------------------------------------------------------------------
+# Reporting seams (EDL Reporting).
+#
+# Every function below is the single place a given edx-platform model is
+# touched, and each returns plain Python primitives (int, dict, list-of-dicts)
+# — never a queryset or model instance. That keeps the reporting *service*
+# layer (admin_portal.reporting.*) free of platform imports so it imports and
+# unit-tests standalone, and it makes these functions the one mock point in the
+# reporting test suite.
+# ---------------------------------------------------------------------------
+
+# Student profile columns for the platform report tasks (features CSV inputs).
+_STUDENT_FEATURES = [
+    'id', 'username', 'name', 'email', 'language', 'location',
+    'year_of_birth', 'gender', 'level_of_education', 'mailing_address',
+    'goals', 'mode', 'is_active', 'date',
+]
+_INACTIVE_FEATURES = [
+    'id', 'username', 'name', 'email', 'mode', 'is_active', 'date',
+]
+
+
+def _learner_queryset(service_accounts, suffixes):
+    """Active accounts that represent actual people (excludes staff/service accounts)."""
+    from django.contrib.auth import get_user_model
+    queryset = get_user_model().objects.filter(
+        is_active=True, is_staff=False, is_superuser=False,
+    ).exclude(username__in=list(service_accounts))
+    for suffix in suffixes:
+        queryset = queryset.exclude(username__endswith=suffix)
+    return queryset
+
+
+def _active_enrollment_count(org=None):
+    """Enrollments whose learner has a StudentModule row, or None if unavailable.
+
+    Returns None (not 0) when courseware is absent from this process (CMS
+    context) or its table is missing — "we cannot see activity" and "no
+    activity" are different facts.
+    """
+    try:
+        from lms.djangoapps.courseware.models import StudentModule
+    except Exception:  # noqa: BLE001 - courseware absent in this process
+        return None
+    from django.db import DatabaseError
+    from django.db.models import Exists, OuterRef
+
+    from common.djangoapps.student.models import CourseEnrollment
+    queryset = CourseEnrollment.objects.filter(is_active=True)
+    if org:
+        queryset = queryset.filter(course__org=org)
+    try:
+        return queryset.filter(
+            Exists(StudentModule.objects.filter(
+                student_id=OuterRef('user_id'), course_id=OuterRef('course_id'),
+            ))
+        ).count()
+    except DatabaseError:
+        return None
+
+
+def reporting_summary_counts(*, this_month, previous_month, now,
+                             service_accounts, suffixes, org=None):
+    """Cheap headline counts for the KPI row. Returns a dict of ints (+ maybe None).
+
+    ``org`` scopes the course and enrollment figures only. Learner and
+    registration counts are always platform-wide by design: Open edX accounts
+    are not owned by an organization, so there is no correct way to attribute a
+    learner to one org. A future org-scoped dashboard must source those two
+    figures differently (e.g. via enrollment in the org's courses).
+    """
+    from django.db.models import Q
+
+    from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+    learners = _learner_queryset(service_accounts, suffixes)
+    courses = CourseOverview.objects.all()
+    if org:
+        courses = courses.filter(org=org)
+    running = Q(start__lte=now) & (Q(end__isnull=True) | Q(end__gte=now))
+    return {
+        'total_learners': learners.count(),
+        'registrations_this_month': learners.filter(date_joined__gte=this_month).count(),
+        'registrations_previous_month': learners.filter(
+            date_joined__gte=previous_month, date_joined__lt=this_month,
+        ).count(),
+        'total_courses': courses.count(),
+        'running_courses': courses.filter(running).count(),
+        'active_enrollments': _active_enrollment_count(org),
+    }
+
+
+def _month_counts(queryset, date_field, start):
+    """Group a queryset by month on ``date_field`` from ``start``: ``{'YYYY-MM': int}``."""
+    from django.db.models import Count
+    from django.db.models.functions import TruncMonth
+    rows = (
+        queryset.filter(**{f'{date_field}__gte': start})
+        .annotate(period=TruncMonth(date_field))
+        .values('period')
+        .annotate(value=Count('pk'))
+    )
+    return {row['period'].strftime('%Y-%m'): row['value'] for row in rows if row['period']}
+
+
+def reporting_enrollment_month_counts(*, start, org=None):
+    """Active-enrollment counts bucketed by creation month: ``{'YYYY-MM': int}``."""
+    from common.djangoapps.student.models import CourseEnrollment
+    queryset = CourseEnrollment.objects.filter(is_active=True)
+    if org:
+        queryset = queryset.filter(course__org=org)
+    return _month_counts(queryset, 'created', start)
+
+
+def reporting_registration_month_counts(*, start, service_accounts, suffixes, org=None):
+    """Learner-registration counts bucketed by join month: ``{'YYYY-MM': int}``.
+
+    Always platform-wide: ``org`` is accepted for call-site symmetry but not
+    applied, because learners are not owned by an org (see
+    ``reporting_summary_counts``).
+    """
+    return _month_counts(_learner_queryset(service_accounts, suffixes), 'date_joined', start)
+
+
+def reporting_course_lifecycle_counts(*, now, org=None):
+    """Mutually exclusive course-run state counts (no_dates/upcoming/running/ended)."""
+    from django.db.models import Q
+
+    from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+    courses = CourseOverview.objects.all()
+    if org:
+        courses = courses.filter(org=org)
+    running = Q(start__lte=now) & (Q(end__isnull=True) | Q(end__gte=now))
+    return {
+        'no_dates': courses.filter(start__isnull=True).count(),
+        'upcoming': courses.filter(start__gt=now).count(),
+        'running': courses.filter(running).count(),
+        'ended': courses.filter(start__lte=now, end__lt=now).count(),
+    }
+
+
+def reporting_course_rows(*, search, org, ordering, limit, offset, now):
+    """One page of annotated course runs. Returns ``{'count': int, 'results': [dict]}``."""
+    from django.db.models import Count, Q
+
+    from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+    valid_orderings = {
+        'display_name', '-display_name', 'start', '-start', 'end', '-end',
+        'enrollment_count', '-enrollment_count', 'org', '-org',
+        'created', '-created',
+    }
+    queryset = CourseOverview.objects.annotate(
+        enrollment_count=Count('courseenrollment', filter=Q(courseenrollment__is_active=True)),
+        unenrolled_count=Count('courseenrollment', filter=Q(courseenrollment__is_active=False)),
+    )
+    if search:
+        queryset = queryset.filter(
+            Q(display_name__icontains=search)
+            | Q(id__icontains=search)
+            | Q(org__icontains=search)
+        )
+    if org:
+        queryset = queryset.filter(org=org)
+    queryset = queryset.order_by(ordering if ordering in valid_orderings else 'display_name')
+
+    total = queryset.count()
+    rows = []
+    for course in queryset[offset:offset + limit]:
+        if course.start is None:
+            state = 'no_dates'
+        elif course.start > now:
+            state = 'upcoming'
+        elif course.end and course.end < now:
+            state = 'ended'
+        else:
+            state = 'running'
+        rows.append({
+            'course_id': str(course.id),
+            'display_name': course.display_name or str(course.id),
+            'org': course.org,
+            'enrollment_count': course.enrollment_count,
+            'unenrolled_count': course.unenrolled_count,
+            'start': course.start.isoformat() if course.start else None,
+            'end': course.end.isoformat() if course.end else None,
+            'created': course.created.isoformat() if course.created else None,
+            'lifecycle_state': state,
+        })
+    return {'count': total, 'results': rows}
+
+
+def submit_instructor_report(request, course_key, report_type):
+    """Queue an async instructor report via the platform task API. Returns task_id (str).
+
+    Reuses ``lms.djangoapps.instructor_task.api`` — the same machinery the
+    instructor dashboard uses — so report generation, storage and download
+    links behave identically to the platform's own report tools. Raises on
+    submission failure (the view maps AlreadyRunning -> 400).
+    """
+    from lms.djangoapps.instructor_task import api as task_api
+    dispatch = {
+        'grade_csv': lambda: task_api.submit_calculate_grades_csv(request, course_key),
+        'profile_info': lambda: task_api.submit_calculate_students_features_csv(
+            request, course_key, _STUDENT_FEATURES),
+        'problem_grade': lambda: task_api.submit_problem_grade_report(request, course_key),
+        'may_enroll': lambda: task_api.submit_calculate_may_enroll_csv(
+            request, course_key, _STUDENT_FEATURES),
+        'inactive_learner': lambda: task_api.submit_calculate_inactive_enrolled_students_csv(
+            request, course_key, _INACTIVE_FEATURES),
+        'survey': lambda: task_api.submit_course_survey_report(request, course_key),
+        'proctored_exam': lambda: task_api.submit_proctored_exam_results_report(request, course_key),
+        'ora_data': lambda: task_api.submit_export_ora2_data(request, course_key),
+        'ora_summary': lambda: task_api.submit_export_ora2_summary(request, course_key),
+        'ora_submission_archive': lambda: task_api.submit_export_ora2_submission_files(
+            request, course_key),
+        'anon_ids': lambda: task_api.generate_anonymous_ids(request, course_key),
+    }
+    return dispatch[report_type]().task_id
+
+
+def report_tasks(course_key, task_types, limit):
+    """Recent InstructorTask rows for the given task types. Returns ``[dict]`` (primitives)."""
+    import json as _json
+
+    from lms.djangoapps.instructor_task.models import InstructorTask
+    tasks = (
+        InstructorTask.objects
+        .filter(course_id=course_key, task_type__in=list(task_types))
+        .order_by('-created')[:limit]
+    )
+    out = []
+    for task in tasks:
+        parsed = {}
+        if task.task_output:
+            try:
+                candidate = _json.loads(task.task_output)
+                if isinstance(candidate, dict):
+                    parsed = candidate
+            except (ValueError, TypeError):
+                pass
+        out.append({
+            'task_id': task.task_id,
+            'task_type': task.task_type,
+            'state': task.task_state,
+            'created': task.created.isoformat(),
+            'modified': task.updated.isoformat() if task.updated is not None else None,
+            'succeeded': parsed.get('succeeded'),
+            'failed': parsed.get('failed'),
+            'total': parsed.get('total'),
+        })
+    return out
+
+
+def report_store_links(course_key):
+    """Fresh ``{filename_key: url}`` from the grades ReportStore, or ``{}`` if unavailable."""
+    try:
+        from lms.djangoapps.instructor_task.models import ReportStore
+        return dict(ReportStore.from_config('GRADES_DOWNLOAD').links_for(course_key))
+    except Exception:  # noqa: BLE001 - store misconfigured/unavailable -> no links
+        return {}
+
+
+def course_grading_config(course_key):
+    """Grader breakdown + grade cutoffs from the modulestore, or None if absent."""
+    from xmodule.modulestore.django import modulestore
+    course = modulestore().get_course(course_key)
+    if course is None:
+        return None
+    grader = [
+        {
+            'type': entry.get('type'),
+            'min_count': entry.get('min_count', 0),
+            'drop_count': entry.get('drop_count', 0),
+            'weight': entry.get('weight', 0),
+            'short_label': entry.get('short_label', ''),
+        }
+        for entry in (course.raw_grader or [])
+    ]
+    return {'grader': grader, 'grade_cutoffs': course.grade_cutoffs}
+
+
+def course_certificates(course_key):
+    """Issued certificate rows for a course. Returns ``[dict]`` (primitives)."""
+    from lms.djangoapps.certificates.models import GeneratedCertificate
+    certs = (
+        GeneratedCertificate.objects
+        .filter(course_id=course_key)
+        .select_related('user')
+        .order_by('-created_date')
+    )
+    return [
+        {
+            'username': cert.user.username,
+            'name': cert.name,
+            'email': cert.user.email,
+            'mode': cert.mode,
+            'status': cert.status,
+            'grade': cert.grade,
+            'created_date': cert.created_date.isoformat() if cert.created_date else None,
+            'download_url': cert.download_url or None,
+            'verify_uuid': str(cert.verify_uuid) if cert.verify_uuid else None,
+        }
+        for cert in certs
+    ]

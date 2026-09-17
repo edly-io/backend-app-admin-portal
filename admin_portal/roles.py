@@ -18,9 +18,9 @@ ACTION_REVOKE = 'revoke'
 # The allow-list. Keys are the platform role levels (lms/.../instructor/access.py
 # ROLES); values are one-line descriptions for the UI.
 GRANTABLE_ROLES = {
-    'instructor': 'Course Admin — full control of the course team, content and settings.',
-    'staff': 'Course Staff — manage content and learners, including Studio authoring.',
-    'limited_staff': 'Limited Staff — course staff privileges in the LMS, without Studio access.',
+    'instructor': 'Course Admin. Full control of the course team, content and settings.',
+    'staff': 'Course Staff. Manage content and learners, including Studio authoring.',
+    'limited_staff': 'Limited Staff. Course staff privileges in the LMS, without Studio access.',
 }
 
 

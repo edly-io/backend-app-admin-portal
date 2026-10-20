@@ -82,6 +82,10 @@ class CreateUserTests(APITestCase):
         self.assertFalse(user.has_usable_password())
         self.mock_email.assert_called_once()
 
+    def test_link_mode_sends_invite_to_created_user(self):
+        self.client.post(self.url, self.payload, format='json')
+        self.assertEqual(self.mock_email.call_args.args[0], User.objects.get(username='learner1'))
+
     def test_link_mode_writes_audit_entry(self):
         self.client.post(self.url, self.payload, format='json')
         entry = EdlAdminAuditLog.objects.get()

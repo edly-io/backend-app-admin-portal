@@ -5,6 +5,12 @@ Change Log
 Unreleased
 ----------
 
+* EDL-51: Accounts created in link mode now get a dedicated welcome email
+  (``AccountInvite`` ACE message) instead of the platform password reset email.
+  The subject, body and sender display name (``PLATFORM_NAME``) are specific to
+  the invitation. The set-password link and activation behaviour are unchanged,
+  and the forgot password email is untouched.
+
 * EDL-10: Course-scoped role management (``GET/POST /admin-portal/api/v1/roles/``).
   GET returns the grantable-role catalog (Course Admin / Course Staff / Limited
   Staff) with one-line descriptions. POST grants/revokes via ``allow_access`` /

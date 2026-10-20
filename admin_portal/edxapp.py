@@ -5,7 +5,9 @@ standalone test suite) imports cleanly without edx-platform present. Tests
 patch these functions; in the LMS they delegate to the real platform helpers.
 
 We deliberately *reuse* the platform's own account-creation, password and
-email machinery rather than reimplementing any of it.
+email machinery (token generator, reset-confirm view, ACE) rather than
+reimplementing it. The one exception is the invite email's message type and
+templates, which are our own (``message_types.AccountInvite``).
 """
 
 try:  # AccountValidationError carries the structured duplicate-field info.
@@ -39,11 +41,50 @@ def generate_password(length=12):
 
 
 def send_set_password_email(user, request=None):
-    """Email the user a single-use set-password link (activates on confirm)."""
-    from openedx.core.djangoapps.user_authn.views.password_reset import (
-        send_password_reset_email_for_user,
+    """
+    Email the user a welcome message with a single-use set-password link.
+
+    Sends the admin portal ``AccountInvite`` message instead of the platform
+    password reset email. The link is built like the platform's
+    ``send_password_reset_email_for_user`` and activates the account on confirm.
+    Without a ``request`` the link uses ``http``, since the scheme comes from
+    ``request.is_secure()``.
+    """
+    from django.conf import settings
+    from django.contrib.auth.tokens import default_token_generator
+    from django.urls import reverse
+    from django.utils.http import int_to_base36
+    from edx_ace import ace
+    from edx_ace.recipient import Recipient
+
+    from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
+    from openedx.core.djangoapps.user_authn.toggles import should_redirect_to_authn_microfrontend
+    from openedx.core.djangoapps.user_authn.views.password_reset import get_user_default_email_params
+
+    from .message_types import AccountInvite
+
+    message_context, user_language_preference = get_user_default_email_params(user)
+    site_name = settings.AUTHN_MICROFRONTEND_DOMAIN if should_redirect_to_authn_microfrontend() \
+        else configuration_helpers.get_value('SITE_NAME', settings.SITE_NAME)
+    message_context.update({
+        'request': request,  # Used by google_analytics_tracking_pixel
+        'platform_name': configuration_helpers.get_value('PLATFORM_NAME', settings.PLATFORM_NAME),
+        'reset_link': '{protocol}://{site}{link}?track=pwreset'.format(
+            protocol='https' if request is not None and request.is_secure() else 'http',
+            site=site_name,
+            link=reverse('password_reset_confirm', kwargs={
+                'uidb36': int_to_base36(user.id),
+                'token': default_token_generator.make_token(user),
+            }),
+        ),
+    })
+
+    msg = AccountInvite().personalize(
+        recipient=Recipient(user.id, user.email),
+        language=user_language_preference,
+        user_context=message_context,
     )
-    return send_password_reset_email_for_user(user, request)
+    ace.send(msg)
 
 
 def set_user_standing(user, disabled, changed_by):

@@ -1,7 +1,7 @@
 """Serializers for the admin_portal v1 REST API."""
 from rest_framework import serializers
 
-from admin_portal.directory import STATUS_CHOICES
+from admin_portal.directory import FILTER_CHOICES
 from admin_portal.reporting import constants as reporting_constants
 from admin_portal.roles import ACTION_ALLOW, ACTION_REVOKE, GRANTABLE_ROLES
 
@@ -18,7 +18,7 @@ class UserListQuerySerializer(serializers.Serializer):
     """Query params for the user directory list."""
 
     search = serializers.CharField(required=False, allow_blank=True, default='')
-    status = serializers.ChoiceField(choices=STATUS_CHOICES, required=False)
+    status = serializers.ChoiceField(choices=FILTER_CHOICES, required=False)
 
 
 class EnrollmentSerializer(serializers.Serializer):

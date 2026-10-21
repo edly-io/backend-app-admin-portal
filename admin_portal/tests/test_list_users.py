@@ -175,3 +175,26 @@ class InviteExpiryTests(APITestCase):
         self.assertFalse(row['invite_expired'])
         self.assertIsNone(row['invite_sent_at'])
         self.assertIsNone(row['invite_expires_at'])
+
+    def test_filter_invitation_expired_returns_only_lapsed_pending_users(self):
+        self._age_user(self.bob, 8)
+        fresh = User.objects.create_user('fresh', email='f@e.com', password='pw', is_active=False)
+        alice = User.objects.create_user('alice', email='a@e.com', password='pw')
+        self._age_user(alice, 30)
+        response = self.client.get(self.url, {'status': 'invitation_expired'})
+        self.assertEqual([r['username'] for r in response.data['results']], ['bob'])
+        self.assertNotIn(fresh.username, [r['username'] for r in response.data['results']])
+
+    def test_filter_pending_excludes_lapsed_invites(self):
+        self._age_user(self.bob, 8)
+        User.objects.create_user('fresh', email='f@e.com', password='pw', is_active=False)
+        response = self.client.get(self.url, {'status': 'pending'})
+        self.assertEqual([r['username'] for r in response.data['results']], ['fresh'])
+
+    def test_resend_moves_a_user_from_expired_to_pending_filter(self):
+        self._age_user(self.bob, 10)
+        EdlAdminAuditLog.objects.create(action=EdlAdminAuditLog.Action.RESEND_INVITE, target_user=self.bob)
+        expired = self.client.get(self.url, {'status': 'invitation_expired'}).data['results']
+        pending = self.client.get(self.url, {'status': 'pending'}).data['results']
+        self.assertEqual(expired, [])
+        self.assertEqual([r['username'] for r in pending], ['bob'])

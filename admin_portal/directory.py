@@ -36,6 +36,12 @@ STATUS_ACTIVE = 'active'
 STATUS_DISABLED = 'disabled'
 STATUS_CHOICES = (STATUS_PENDING, STATUS_ACTIVE, STATUS_DISABLED)
 
+# Filter-only value: a pending user whose set-password link has lapsed. Rows still
+# report ``status='pending'`` with ``invite_expired=True``. The ``pending`` filter
+# returns only users whose link is still valid, so each filter matches its badge.
+FILTER_INVITATION_EXPIRED = 'invitation_expired'
+FILTER_CHOICES = STATUS_CHOICES + (FILTER_INVITATION_EXPIRED,)
+
 _HAS_PROFILE = hasattr(User, 'profile')
 _HAS_STANDING = hasattr(User, 'standing')
 _HAS_ENROLLMENTS = hasattr(User, 'courseenrollment_set')
@@ -85,11 +91,15 @@ def _apply_status(queryset, status):
         if _HAS_STANDING:
             queryset = queryset.exclude(standing__account_status=ACCOUNT_DISABLED)
         return queryset
-    if status == STATUS_PENDING:
+    if status in (STATUS_PENDING, FILTER_INVITATION_EXPIRED):
         queryset = queryset.filter(is_active=False)
         if _HAS_STANDING:
             queryset = queryset.exclude(standing__account_status=ACCOUNT_DISABLED)
-        return queryset
+        # Same rule as ``serialize_user``: expired once the invite is older than the timeout.
+        cutoff = timezone.now() - timedelta(seconds=settings.PASSWORD_RESET_TIMEOUT)
+        if status == FILTER_INVITATION_EXPIRED:
+            return queryset.filter(invite_sent_at__lt=cutoff)
+        return queryset.filter(invite_sent_at__gte=cutoff)
     return queryset
 
 

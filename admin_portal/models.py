@@ -22,6 +22,7 @@ class EdlAdminAuditLog(models.Model):
         UNENROLL = 'unenroll', 'Unenroll'
         ROLE_GRANT = 'role_grant', 'Grant course role'
         ROLE_REVOKE = 'role_revoke', 'Revoke course role'
+        RESEND_INVITE = 'resend_invite', 'Resend invite'
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,

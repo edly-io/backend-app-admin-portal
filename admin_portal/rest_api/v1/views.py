@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from admin_portal import __version__
-from admin_portal.accounts import CreateUserError, create_learner
+from admin_portal.accounts import CreateUserError, InviteNotAllowed, create_learner, resend_invite
 from admin_portal.audit import record_action
 from admin_portal.directory import list_users, serialize_user
 from admin_portal.enrollment import ACTION_ENROLL, ACTION_UNENROLL, EnrollmentError, update_enrollments
@@ -257,5 +257,26 @@ class RolesView(AdminPortalAPIView):
                 'role': data['role'],
                 'action': data['action'],
             },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResendInviteView(AdminPortalAPIView):
+    """Email a pending user a fresh set-password link; older links stop working."""
+
+    def post(self, request, username):  # noqa: D102
+        try:
+            user = resend_invite(username=username, request=request)
+        except UserNotFound:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        except InviteNotAllowed:
+            return Response(
+                {'detail': 'Only users with a pending invitation can be re-invited.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        entry = record_action(request.user, EdlAdminAuditLog.Action.RESEND_INVITE, target_user=user)
+        return Response(
+            {'username': user.username, 'invite_sent_at': entry.created},
             status=status.HTTP_200_OK,
         )

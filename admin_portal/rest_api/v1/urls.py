@@ -19,6 +19,7 @@ urlpatterns = [
     path('users/', views.UsersView.as_view(), name='users'),
     path('users/<str:username>/deactivate/', views.DeactivateUserView.as_view(), name='user-deactivate'),
     path('users/<str:username>/reactivate/', views.ReactivateUserView.as_view(), name='user-reactivate'),
+    path('users/<str:username>/resend-invite/', views.ResendInviteView.as_view(), name='user-resend-invite'),
     path('enrollments/enroll/', views.EnrollView.as_view(), name='enroll'),
     path('enrollments/unenroll/', views.UnenrollView.as_view(), name='unenroll'),
     path('roles/', views.RolesView.as_view(), name='roles'),

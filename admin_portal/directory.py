@@ -16,8 +16,13 @@ models. We engage them via ``hasattr`` capability checks so the same code runs
 standalone (username/email search + is_active status) and in the LMS (adds
 name search + disabled status).
 """
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db.models import Count, Q
+from django.db.models import Count, F, OuterRef, Q, Subquery
+from django.db.models.functions import Coalesce
+from django.utils import timezone
+
+from admin_portal.models import EdlAdminAuditLog
 
 User = get_user_model()
 
@@ -99,6 +104,12 @@ def list_users(*, search='', status=None):
         queryset = queryset.annotate(
             enrollment_count=Count('courseenrollment', filter=Q(courseenrollment__is_active=True)),
         )
+    # Latest invite email: the create or resend audit row, else the join date.
+    last_invite = EdlAdminAuditLog.objects.filter(
+        target_user=OuterRef('pk'),
+        action__in=(EdlAdminAuditLog.Action.CREATE_USER, EdlAdminAuditLog.Action.RESEND_INVITE),
+    ).order_by('-created').values('created')[:1]
+    queryset = queryset.annotate(invite_sent_at=Coalesce(Subquery(last_invite), F('date_joined')))
     if search:
         queryset = queryset.filter(_search_q(search))
     return _apply_status(queryset, status)
@@ -125,13 +136,23 @@ def serialize_user(user):
     ``enrollment_count`` is ``None`` when run standalone (no student app, so
     no ``courseenrollment`` relation to annotate) rather than a misleading 0.
     """
+    status = derive_status(user.is_active, get_standing_status(user))
+    invite_sent_at = getattr(user, 'invite_sent_at', None)
+    invite_expired = (
+        status == STATUS_PENDING
+        and invite_sent_at is not None
+        and (timezone.now() - invite_sent_at).total_seconds() > settings.PASSWORD_RESET_TIMEOUT
+    )
     return {
         'id': user.id,
         'username': user.username,
         'email': user.email,
         'name': get_profile_name(user),
         'is_active': user.is_active,
-        'status': derive_status(user.is_active, get_standing_status(user)),
+        'status': status,
+        'date_joined': user.date_joined,
+        'invite_sent_at': invite_sent_at if status == STATUS_PENDING else None,
+        'invite_expired': invite_expired,
         'lms_role': derive_lms_role(user),
         'enrollment_count': getattr(user, 'enrollment_count', None),
     }

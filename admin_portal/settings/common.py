@@ -21,6 +21,10 @@ def plugin_settings(settings):
     #   'copy'  -> generate a password and surface it once to the admin
     settings.ADMIN_PORTAL_PASSWORD_MODE = 'link'
 
+    # Lifetime (seconds) of set-password links, 7 days. This is Django's global
+    # setting, so the platform's forgot-password link also lasts 7 days.
+    settings.PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 7
+
     # Absolute URL of the Admin Portal MFE. The LMS-host landing page
     # (``/admin-portal/``) redirects admins here. Leave empty to derive
     # ``<scheme>://apps.<lms-host>/admin-portal/`` from the request (the tutor

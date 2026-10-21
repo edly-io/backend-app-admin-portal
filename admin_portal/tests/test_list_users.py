@@ -5,9 +5,13 @@ status, pagination and the gate. Name search (UserProfile) and the disabled
 status (UserStanding) engage only in-platform; the pure status mapping is
 tested directly via ``derive_status``.
 """
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -17,6 +21,7 @@ from admin_portal.directory import (
     STATUS_PENDING,
     derive_status,
 )
+from admin_portal.models import EdlAdminAuditLog
 
 User = get_user_model()
 
@@ -62,7 +67,10 @@ class UserListTests(APITestCase):
         row = response.data['results'][0]
         self.assertEqual(
             set(row.keys()),
-            {'id', 'username', 'email', 'name', 'is_active', 'status', 'lms_role', 'enrollment_count'},
+            {
+                'id', 'username', 'email', 'name', 'is_active', 'status', 'date_joined',
+                'invite_sent_at', 'invite_expires_at', 'invite_expired', 'lms_role', 'enrollment_count',
+            },
         )
         self.assertEqual(row['username'], 'alice')
         self.assertEqual(row['status'], STATUS_ACTIVE)
@@ -111,3 +119,59 @@ class UserListTests(APITestCase):
         response = self.client.get(self.url, {'page_size': 2})
         self.assertEqual(len(response.data['results']), 2)
         self.assertIsNotNone(response.data['next'])
+
+
+@override_settings(PASSWORD_RESET_TIMEOUT=7 * 24 * 60 * 60)
+class InviteExpiryTests(APITestCase):
+    def setUp(self):
+        self.url = reverse('admin_portal:v1:users')
+        self.admin = User.objects.create_user('admin', email='admin@e.com', password='pw')
+        self.admin.groups.add(Group.objects.get(name='edl_admin'))
+        self.client.force_login(self.admin)
+        self.bob = User.objects.create_user('bob', email='bob@e.com', password='pw', is_active=False)
+
+    def _row(self, username):
+        results = self.client.get(self.url, {'search': username}).data['results']
+        return next(r for r in results if r['username'] == username)
+
+    def _age_user(self, user, days):
+        User.objects.filter(pk=user.pk).update(date_joined=timezone.now() - timedelta(days=days))
+
+    def test_fresh_pending_invite_is_not_expired(self):
+        row = self._row('bob')
+        self.assertFalse(row['invite_expired'])
+        self.assertIsNotNone(row['invite_sent_at'])
+
+    def test_expiry_date_is_seven_days_after_the_invite(self):
+        row = self._row('bob')
+        self.assertEqual(row['invite_expires_at'] - row['invite_sent_at'], timedelta(days=7))
+
+    def test_pending_invite_expires_after_seven_days(self):
+        self._age_user(self.bob, 8)
+        self.assertTrue(self._row('bob')['invite_expired'])
+
+    def test_just_inside_the_window_is_not_expired(self):
+        self._age_user(self.bob, 6)
+        self.assertFalse(self._row('bob')['invite_expired'])
+
+    def test_resend_audit_row_resets_the_window(self):
+        self._age_user(self.bob, 10)
+        entry = EdlAdminAuditLog.objects.create(
+            action=EdlAdminAuditLog.Action.RESEND_INVITE, target_user=self.bob,
+        )
+        row = self._row('bob')
+        self.assertFalse(row['invite_expired'])
+        self.assertEqual(row['invite_sent_at'], entry.created)
+
+    def test_create_audit_row_is_the_invite_time_when_present(self):
+        self._age_user(self.bob, 10)
+        EdlAdminAuditLog.objects.create(action=EdlAdminAuditLog.Action.CREATE_USER, target_user=self.bob)
+        self.assertFalse(self._row('bob')['invite_expired'])
+
+    def test_active_user_is_never_expired_and_has_no_invite_time(self):
+        alice = User.objects.create_user('alice', email='a@e.com', password='pw')
+        self._age_user(alice, 30)
+        row = self._row('alice')
+        self.assertFalse(row['invite_expired'])
+        self.assertIsNone(row['invite_sent_at'])
+        self.assertIsNone(row['invite_expires_at'])

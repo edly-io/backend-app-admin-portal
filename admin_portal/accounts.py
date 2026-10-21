@@ -12,10 +12,15 @@ Wraps the platform's ``do_create_account`` with the panel's rules:
 """
 import logging
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 
 from admin_portal import edxapp
+from admin_portal.directory import STATUS_PENDING, derive_status, get_standing_status
+from admin_portal.standing import UserNotFound
+
+User = get_user_model()
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +34,10 @@ class CreateUserError(Exception):
         super().__init__(str(field_errors))
         self.field_errors = field_errors
         self.status_code = status_code
+
+
+class InviteNotAllowed(Exception):
+    """Raised when a user is not pending (already active, or disabled)."""
 
 
 def _looks_like_conflict(messages):
@@ -87,3 +96,23 @@ def create_learner(*, actor, request, username, email, name, password_mode='link
         edxapp.send_set_password_email(user, getattr(request, '_request', request))
 
     return user, result_password
+
+
+def resend_invite(*, username, request):
+    """
+    Email a pending user a fresh set-password link.
+
+    Setting a new unusable password changes the token hash, so any earlier link
+    stops working. Returns the user. Raises :class:`UserNotFound` for an unknown
+    username and :class:`InviteNotAllowed` unless the user is pending.
+    """
+    user = User.objects.filter(username=username).first()
+    if user is None:
+        raise UserNotFound(username)
+    if derive_status(user.is_active, get_standing_status(user)) != STATUS_PENDING:
+        raise InviteNotAllowed(username)
+
+    user.set_unusable_password()
+    user.save(update_fields=['password'])
+    edxapp.send_set_password_email(user, request)
+    return user

@@ -16,6 +16,8 @@ models. We engage them via ``hasattr`` capability checks so the same code runs
 standalone (username/email search + is_active status) and in the LMS (adds
 name search + disabled status).
 """
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Count, F, OuterRef, Q, Subquery
@@ -138,11 +140,10 @@ def serialize_user(user):
     """
     status = derive_status(user.is_active, get_standing_status(user))
     invite_sent_at = getattr(user, 'invite_sent_at', None)
-    invite_expired = (
-        status == STATUS_PENDING
-        and invite_sent_at is not None
-        and (timezone.now() - invite_sent_at).total_seconds() > settings.PASSWORD_RESET_TIMEOUT
-    )
+    invite_expires_at = None
+    if status == STATUS_PENDING and invite_sent_at is not None:
+        invite_expires_at = invite_sent_at + timedelta(seconds=settings.PASSWORD_RESET_TIMEOUT)
+    invite_expired = invite_expires_at is not None and timezone.now() > invite_expires_at
     return {
         'id': user.id,
         'username': user.username,
@@ -152,6 +153,7 @@ def serialize_user(user):
         'status': status,
         'date_joined': user.date_joined,
         'invite_sent_at': invite_sent_at if status == STATUS_PENDING else None,
+        'invite_expires_at': invite_expires_at,
         'invite_expired': invite_expired,
         'lms_role': derive_lms_role(user),
         'enrollment_count': getattr(user, 'enrollment_count', None),

@@ -69,7 +69,7 @@ class UserListTests(APITestCase):
             set(row.keys()),
             {
                 'id', 'username', 'email', 'name', 'is_active', 'status', 'date_joined',
-                'invite_sent_at', 'invite_expired', 'lms_role', 'enrollment_count',
+                'invite_sent_at', 'invite_expires_at', 'invite_expired', 'lms_role', 'enrollment_count',
             },
         )
         self.assertEqual(row['username'], 'alice')
@@ -142,6 +142,10 @@ class InviteExpiryTests(APITestCase):
         self.assertFalse(row['invite_expired'])
         self.assertIsNotNone(row['invite_sent_at'])
 
+    def test_expiry_date_is_seven_days_after_the_invite(self):
+        row = self._row('bob')
+        self.assertEqual(row['invite_expires_at'] - row['invite_sent_at'], timedelta(days=7))
+
     def test_pending_invite_expires_after_seven_days(self):
         self._age_user(self.bob, 8)
         self.assertTrue(self._row('bob')['invite_expired'])
@@ -170,3 +174,4 @@ class InviteExpiryTests(APITestCase):
         row = self._row('alice')
         self.assertFalse(row['invite_expired'])
         self.assertIsNone(row['invite_sent_at'])
+        self.assertIsNone(row['invite_expires_at'])

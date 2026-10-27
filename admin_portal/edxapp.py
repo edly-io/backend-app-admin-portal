@@ -69,6 +69,7 @@ def send_set_password_email(user, request=None):
     message_context.update({
         'request': request,  # Used by google_analytics_tracking_pixel
         'platform_name': configuration_helpers.get_value('PLATFORM_NAME', settings.PLATFORM_NAME),
+        'homepage_url': settings.LMS_ROOT_URL,
         'reset_link': '{protocol}://{site}{link}?track=pwreset'.format(
             protocol='https' if request is not None and request.is_secure() else 'http',
             site=site_name,

@@ -44,6 +44,20 @@ def test_body_txt_contains_reset_link_and_welcome_copy():
     assert "If you weren't expecting this invitation, you can disregard this email." in body
 
 
+def test_body_txt_contains_visible_skills_blurb():
+    body = _render('body.txt')
+    assert 'Visible Skills, from Education Design Lab, helps you build and validate durable skills' in body
+    assert body.index('durable skills') < body.index(RESET_LINK)
+
+
+def test_invite_base_body_footer_ends_with_copyright():
+    base = (PACKAGE_ROOT / 'templates' / 'admin_portal/edx_ace/common/invite_base_body.html').read_text()
+    assert base.index('contact_email') < base.index('<!-- COPYRIGHT -->')
+    assert 'contact_mailing_address' not in base
+    assert 'Our mailing address is' not in base
+    assert 'SOCIAL' not in base
+
+
 def test_body_txt_does_not_mention_password_reset():
     assert 'password reset' not in _render('body.txt').lower()
 

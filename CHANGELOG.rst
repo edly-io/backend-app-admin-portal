@@ -5,6 +5,11 @@ Change Log
 Unreleased
 ----------
 
+* Welcome email branding: new ``invite_base_body.html`` (copy of the platform ACE
+  base body) caps the logo by width, drops the unused social and app-store rows,
+  and moves the copyright line to the very bottom after the mailing address. The
+  body adds the Visible Skills blurb.
+
 * EDL-51: Accounts created in link mode now get a dedicated welcome email
   (``AccountInvite`` ACE message) instead of the platform password reset email.
   The subject, body and sender display name (``PLATFORM_NAME``) are specific to

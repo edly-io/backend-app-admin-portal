@@ -104,8 +104,8 @@ def _apply_status(queryset, status):
 
 
 def list_users(*, search='', status=None):
-    """Return an ordered User queryset filtered by search term and status."""
-    queryset = User.objects.all().order_by('id')
+    """Return a User queryset, newest first, filtered by search term and status."""
+    queryset = User.objects.all().order_by('-id')
     if _HAS_PROFILE:
         queryset = queryset.select_related('profile')
     if _HAS_STANDING:

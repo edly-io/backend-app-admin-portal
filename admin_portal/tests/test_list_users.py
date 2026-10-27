@@ -90,6 +90,11 @@ class UserListTests(APITestCase):
         self.assertEqual(roles[staffer.username], 'staff')
         self.assertEqual(roles[root.username], 'admin')
 
+    def test_newest_users_listed_first(self):
+        response = self.client.get(self.url)
+        usernames = [r['username'] for r in response.data['results']]
+        self.assertEqual(usernames, ['bob', 'alice', 'admin'])
+
     def test_search_by_username(self):
         response = self.client.get(self.url, {'search': 'ali'})
         usernames = [r['username'] for r in response.data['results']]

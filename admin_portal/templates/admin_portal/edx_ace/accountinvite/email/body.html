@@ -1,4 +1,4 @@
-{% extends 'ace_common/edx_ace/common/base_body.html' %}
+{% extends 'admin_portal/edx_ace/common/invite_base_body.html' %}
 
 {% load i18n %}
 {% load static %}
@@ -14,6 +14,12 @@
             <p style="color: rgba(0,0,0,.75); margin: 0 0 24px 0;">
                 {% filter force_escape %}
                 {% blocktrans %}You've been enrolled in {{ platform_name }}. Create your password to access your account and get started.{% endblocktrans %}
+                {% endfilter %}
+            </p>
+
+            <p style="color: rgba(0,0,0,.75); margin: 0 0 24px 0;">
+                {% filter force_escape %}
+                {% blocktrans %}Visible Skills, from Education Design Lab, helps you build and validate durable skills like critical thinking, communication, empathy and more. Through activities and real-world scenarios, you can learn and demonstrate what you know, earn digital micro-credentials, and gain confidence sharing your strengths in school, at work, and beyond.{% endblocktrans %}
                 {% endfilter %}
             </p>
 

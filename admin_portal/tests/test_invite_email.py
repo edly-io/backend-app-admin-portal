@@ -116,6 +116,7 @@ def platform_fakes():
 def test_send_set_password_email_sends_invite_with_context(platform_fakes, settings):
     settings.SITE_NAME = 'lms.example.com'
     settings.PLATFORM_NAME = 'Fallback'
+    settings.LMS_ROOT_URL = 'https://lms.example.com'
     user = SimpleNamespace(id=7, email='learner@example.com')
     request = SimpleNamespace(is_secure=lambda: True)
 
@@ -129,6 +130,7 @@ def test_send_set_password_email_sends_invite_with_context(platform_fakes, setti
     context = kwargs['user_context']
     assert context['base'] == 1
     assert context['platform_name'] == 'Visible Skills'
+    assert context['homepage_url'] == 'https://lms.example.com'
     assert context['reset_link'] == 'https://lms.example.com/password/reset/7/tok/?track=pwreset'
     platform_fakes.ace.send.assert_called_once_with(platform_fakes.invite_cls.return_value.personalize.return_value)
 
@@ -136,6 +138,7 @@ def test_send_set_password_email_sends_invite_with_context(platform_fakes, setti
 def test_send_set_password_email_without_request_uses_http(platform_fakes, settings):
     settings.SITE_NAME = 'lms.example.com'
     settings.PLATFORM_NAME = 'Fallback'
+    settings.LMS_ROOT_URL = 'https://lms.example.com'
     user = SimpleNamespace(id=7, email='learner@example.com')
 
     with mock.patch('django.urls.reverse', return_value='/password/reset/7/tok/'), \

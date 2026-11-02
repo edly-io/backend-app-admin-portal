@@ -44,6 +44,20 @@ def test_body_txt_contains_reset_link_and_welcome_copy():
     assert "If you weren't expecting this invitation, you can disregard this email." in body
 
 
+def test_body_txt_contains_visible_skills_blurb():
+    body = _render('body.txt')
+    assert 'Visible Skills, from Education Design Lab, helps you build and validate durable skills' in body
+    assert body.index('durable skills') < body.index(RESET_LINK)
+
+
+def test_invite_base_body_footer_ends_with_copyright():
+    base = (PACKAGE_ROOT / 'templates' / 'admin_portal/edx_ace/common/invite_base_body.html').read_text()
+    assert base.index('contact_email') < base.index('<!-- COPYRIGHT -->')
+    assert 'contact_mailing_address' not in base
+    assert 'Our mailing address is' not in base
+    assert 'SOCIAL' not in base
+
+
 def test_body_txt_does_not_mention_password_reset():
     assert 'password reset' not in _render('body.txt').lower()
 
@@ -102,6 +116,7 @@ def platform_fakes():
 def test_send_set_password_email_sends_invite_with_context(platform_fakes, settings):
     settings.SITE_NAME = 'lms.example.com'
     settings.PLATFORM_NAME = 'Fallback'
+    settings.LMS_ROOT_URL = 'https://lms.example.com'
     user = SimpleNamespace(id=7, email='learner@example.com')
     request = SimpleNamespace(is_secure=lambda: True)
 
@@ -115,6 +130,7 @@ def test_send_set_password_email_sends_invite_with_context(platform_fakes, setti
     context = kwargs['user_context']
     assert context['base'] == 1
     assert context['platform_name'] == 'Visible Skills'
+    assert context['homepage_url'] == 'https://lms.example.com'
     assert context['reset_link'] == 'https://lms.example.com/password/reset/7/tok/?track=pwreset'
     platform_fakes.ace.send.assert_called_once_with(platform_fakes.invite_cls.return_value.personalize.return_value)
 
@@ -122,6 +138,7 @@ def test_send_set_password_email_sends_invite_with_context(platform_fakes, setti
 def test_send_set_password_email_without_request_uses_http(platform_fakes, settings):
     settings.SITE_NAME = 'lms.example.com'
     settings.PLATFORM_NAME = 'Fallback'
+    settings.LMS_ROOT_URL = 'https://lms.example.com'
     user = SimpleNamespace(id=7, email='learner@example.com')
 
     with mock.patch('django.urls.reverse', return_value='/password/reset/7/tok/'), \

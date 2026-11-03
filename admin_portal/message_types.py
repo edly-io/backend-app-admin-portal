@@ -31,3 +31,8 @@ class AccountInvite(BaseMessageType):
         platform_name = configuration_helpers.get_value('PLATFORM_NAME', settings.PLATFORM_NAME)
         address = parseaddr(self.options.get('from_address') or settings.DEFAULT_FROM_EMAIL)[1]
         self.options['from_address'] = formataddr((platform_name, address))
+
+        # The sender may be a send-only address, so replies go to the contact address shown in the footer.
+        contact_email = configuration_helpers.get_value('contact_email', settings.CONTACT_EMAIL)
+        if contact_email:
+            self.options.setdefault('reply_to', [contact_email])

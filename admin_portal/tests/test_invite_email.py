@@ -185,6 +185,7 @@ def _load_account_invite(site_from_address):
 @pytest.fixture
 def platform_settings(settings):
     settings.PLATFORM_NAME = 'Fallback'
+    settings.CONTACT_EMAIL = 'help@example.org'
     return settings
 
 
@@ -205,3 +206,15 @@ def test_account_invite_falls_back_to_default_from_email(platform_settings):
     platform_settings.DEFAULT_FROM_EMAIL = 'Old Name <noreply@example.com>'
     options = _load_account_invite(None)().options
     assert options['from_address'] == 'Visible Skills <noreply@example.com>'
+
+
+@pytest.mark.usefixtures('platform_settings')
+def test_account_invite_replies_go_to_contact_email():
+    options = _load_account_invite('contact@example.com')().options
+    assert options['reply_to'] == ['help@example.org']
+
+
+def test_account_invite_skips_reply_to_without_contact_email(platform_settings):
+    platform_settings.CONTACT_EMAIL = ''
+    options = _load_account_invite('contact@example.com')().options
+    assert 'reply_to' not in options

@@ -5,6 +5,9 @@ Change Log
 Unreleased
 ----------
 
+* EDLINTERNA-30: The welcome email footer no longer shows the platform website
+  link under "Contact us". The contact email stays.
+
 * Welcome email branding: new ``invite_base_body.html`` (copy of the platform ACE
   base body) caps the logo by width, drops the unused social and app-store rows,
   and moves the copyright line to the very bottom after the mailing address. The

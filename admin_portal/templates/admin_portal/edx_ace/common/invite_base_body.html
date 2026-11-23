@@ -162,9 +162,8 @@
         <td style="padding-bottom: 20px;">
           {% if contact_email %}
             {% trans "Contact us:" as tmsg %}{{ tmsg | force_escape }}
-            <a href="mailto:{{ contact_email }}" style="color: #005686">{{ contact_email }}</a><br/>
+            <a href="mailto:{{ contact_email }}" style="color: #005686">{{ contact_email }}</a>
           {% endif %}
-          <a href="{% with_link_tracking homepage_url %}" style="color: #005686">{{ homepage_url }}</a>
         </td>
       </tr>
       {% if unsubscribe_url %}

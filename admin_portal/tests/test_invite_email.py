@@ -54,6 +54,9 @@ def test_invite_base_body_footer_ends_with_copyright():
     base = (PACKAGE_ROOT / 'templates' / 'admin_portal/edx_ace/common/invite_base_body.html').read_text()
     assert base.index('contact_email') < base.index('<!-- COPYRIGHT -->')
     assert 'contact_mailing_address' not in base
+    contact_block = base[base.index('<!-- CONTACT -->'):base.index('<!-- COPYRIGHT -->')]
+    assert 'homepage_url' not in contact_block
+    assert 'mailto:{{ contact_email }}' in contact_block
     assert 'Our mailing address is' not in base
     assert 'SOCIAL' not in base
 

@@ -47,6 +47,7 @@ class UserListGateTests(APITestCase):
 
 class UserListTests(APITestCase):
     def setUp(self):
+        User.objects.filter(username='edl_portal_service').delete()
         self.url = reverse('admin_portal:v1:users')
         self.admin = User.objects.create_user('admin', email='admin@e.com', password='pw')
         self.admin.groups.add(Group.objects.get(name='edl_admin'))
@@ -62,6 +63,12 @@ class UserListTests(APITestCase):
             self.assertIn(key, response.data)
         self.assertEqual(response.data['count'], 3)  # admin + alice + bob
 
+    def test_service_account_is_not_listed(self):
+        User.objects.create_user('edl_portal_service', email='svc@e.com', password='pw', is_staff=True)
+        response = self.client.get(self.url)
+        self.assertEqual(response.data['count'], 3)
+        self.assertNotIn('edl_portal_service', [row['username'] for row in response.data['results']])
+
     def test_result_shape(self):
         response = self.client.get(self.url, {'search': 'alice'})
         row = response.data['results'][0]
@@ -70,6 +77,7 @@ class UserListTests(APITestCase):
             {
                 'id', 'username', 'email', 'name', 'is_active', 'status', 'date_joined',
                 'invite_sent_at', 'invite_expires_at', 'invite_expired', 'lms_role', 'enrollment_count',
+                'org_admin_orgs', 'org_admin_all_orgs', 'org_visibility_orgs',
             },
         )
         self.assertEqual(row['username'], 'alice')

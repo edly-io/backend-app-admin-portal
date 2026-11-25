@@ -7,19 +7,42 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from admin_portal import __version__
-from admin_portal.accounts import CreateUserError, InviteNotAllowed, create_learner, resend_invite
+from admin_portal.accounts import (
+    CreateUserError,
+    InviteNotAllowed,
+    create_learner,
+    resend_invite,
+)
 from admin_portal.audit import record_action
 from admin_portal.directory import list_users, serialize_user
-from admin_portal.enrollment import ACTION_ENROLL, ACTION_UNENROLL, EnrollmentError, update_enrollments
+from admin_portal.enrollment import (
+    ACTION_ENROLL,
+    ACTION_UNENROLL,
+    EnrollmentError,
+    update_enrollments,
+)
 from admin_portal.models import EdlAdminAuditLog
+from admin_portal.org_access import (
+    OrgAccessError,
+    get_org_access,
+    list_organizations,
+    org_access_for_users,
+    set_org_access,
+)
 from admin_portal.rest_api.base import AdminPortalAPIView
 from admin_portal.rest_api.v1.serializers import (
     CreateUserSerializer,
     EnrollmentSerializer,
+    OrgAccessUpdateSerializer,
     RoleActionSerializer,
     UserListQuerySerializer,
 )
-from admin_portal.roles import ACTION_ALLOW, RoleActionError, change_course_role, role_catalog
+from admin_portal.roles import (
+    ACTION_ALLOW,
+    RoleActionError,
+    change_course_role,
+    role_catalog,
+)
 from admin_portal.standing import UserNotFound, set_account_disabled
 
 
@@ -89,7 +112,8 @@ class UsersView(AdminPortalAPIView):
         )
         paginator = UserListPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
-        return paginator.get_paginated_response([serialize_user(u) for u in page])
+        access = org_access_for_users([user.id for user in page])
+        return paginator.get_paginated_response([serialize_user(u, access.get(u.id)) for u in page])
 
     def post(self, request):  # noqa: D102
         serializer = CreateUserSerializer(data=request.data)
@@ -280,3 +304,39 @@ class ResendInviteView(AdminPortalAPIView):
             {'username': user.username, 'invite_sent_at': entry.created},
             status=status.HTTP_200_OK,
         )
+
+
+def _org_error(exc):
+    body = {'code': exc.code, 'detail': exc.detail}
+    if exc.field_errors is not None:
+        body['field_errors'] = exc.field_errors
+    if exc.out_of_sync is not None:
+        body['out_of_sync'] = exc.out_of_sync
+    return Response(body, status=exc.status)
+
+
+class OrgAccessView(AdminPortalAPIView):
+    """Read or replace organization access for a user."""
+
+    def get(self, request, username):
+        try:
+            return Response(get_org_access(username))
+        except OrgAccessError as exc:
+            return _org_error(exc)
+
+    def put(self, request, username):
+        serializer = OrgAccessUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'code': 'validation_error', 'detail': 'Check the fields below.',
+                             'field_errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            return Response(set_org_access(actor=request.user, username=username, **serializer.validated_data))
+        except OrgAccessError as exc:
+            return _org_error(exc)
+
+
+class OrganizationsView(AdminPortalAPIView):
+    """List active organizations."""
+
+    def get(self, request):
+        return Response({'results': list_organizations()})

@@ -5,6 +5,8 @@ Change Log
 Unreleased
 ----------
 
+* Add organization access management and Studio service account.
+
 * EDLINTERNA-30: The welcome email footer no longer shows the platform website
   link under "Contact us". The contact email stays.
 

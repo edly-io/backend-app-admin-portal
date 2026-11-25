@@ -269,3 +269,27 @@ License
 =======
 
 AGPL-3.0 (matching the Open edX platform).
+
+Organization access
+-------------------
+
+The admin API exposes ``GET organizations/`` and ``GET`` / ``PUT
+users/<username>/org-access/``. The user directory includes organization
+creator and visibility roles. Visibility grants organization-wide course
+administrator and reporting access, including future courses. Course-level
+roles remain when organization access is removed. The Gradebook application
+does not support organization-only roles.
+
+The portal creates the configured ``ADMIN_PORTAL_SERVICE_USER`` through a data
+migration, with staff access and an unusable password. This username must match
+the Studio setting. The portal uses ``ADMIN_PORTAL_STUDIO_URL`` (or the CMS
+base URL), ``ADMIN_PORTAL_STUDIO_TIMEOUT``, ``ADMIN_PORTAL_STUDIO_MAX_ATTEMPTS``
+and ``ADMIN_PORTAL_STUDIO_BACKOFF`` for Studio calls. If the service username
+changes, update the frontend service-account exclusion too.
+
+A save writes Studio creator access first, then LMS visibility roles. If the
+latter fails, the portal asks Studio to restore its signed snapshot. An
+``out_of_sync`` error means that restoration could not be confirmed, so the
+access shown should be checked and saved again or escalated to support. Studio
+role history records the service account, while the portal audit records the
+acting administrator.

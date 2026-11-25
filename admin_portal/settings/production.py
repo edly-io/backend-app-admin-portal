@@ -19,3 +19,9 @@ def plugin_settings(settings):
     settings.ADMIN_PORTAL_SUPERUSER_BYPASS = env_tokens.get(
         'ADMIN_PORTAL_SUPERUSER_BYPASS', settings.ADMIN_PORTAL_SUPERUSER_BYPASS,
     )
+
+    for name in (
+        'ADMIN_PORTAL_SERVICE_USER', 'ADMIN_PORTAL_STUDIO_URL', 'ADMIN_PORTAL_STUDIO_TIMEOUT',
+        'ADMIN_PORTAL_STUDIO_MAX_ATTEMPTS', 'ADMIN_PORTAL_STUDIO_BACKOFF',
+    ):
+        setattr(settings, name, env_tokens.get(name, getattr(settings, name)))

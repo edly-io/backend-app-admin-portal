@@ -1,7 +1,7 @@
 """Course-scoped role management for the admin_portal plugin (EDL-10).
 
-Only course-scoped roles are grantable — Site Admin / Global Staff and
-org-wide roles are deliberately excluded. Granting mirrors the platform's
+This module grants only course-scoped roles. Organization-wide access is managed
+in org_access.py (EDLINTERNA-32). Granting mirrors the platform's
 Course Team dashboard (``ModifyAccess``): the target must be active, and a
 grantee is auto-enrolled in the course if not already enrolled — reusing
 ``allow_access`` alone would leave a "staff" member who can't see the course.

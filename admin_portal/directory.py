@@ -106,6 +106,10 @@ def _apply_status(queryset, status):
 def list_users(*, search='', status=None):
     """Return a User queryset, newest first, filtered by search term and status."""
     queryset = User.objects.all().order_by('-id')
+    # The portal's own service account is not a person: keep it out of the list and its page counts.
+    service_username = getattr(settings, 'ADMIN_PORTAL_SERVICE_USER', None)
+    if service_username:
+        queryset = queryset.exclude(username=service_username)
     if _HAS_PROFILE:
         queryset = queryset.select_related('profile')
     if _HAS_STANDING:
@@ -142,7 +146,7 @@ def derive_lms_role(user):
     return 'learner'
 
 
-def serialize_user(user):
+def serialize_user(user, org_access=None):
     """Serialize a user row for the directory list.
 
     ``enrollment_count`` is ``None`` when run standalone (no student app, so
@@ -167,4 +171,7 @@ def serialize_user(user):
         'invite_expired': invite_expired,
         'lms_role': derive_lms_role(user),
         'enrollment_count': getattr(user, 'enrollment_count', None),
+        'org_admin_orgs': (org_access or {}).get('org_admin_orgs', []),
+        'org_admin_all_orgs': (org_access or {}).get('org_admin_all_orgs', False),
+        'org_visibility_orgs': (org_access or {}).get('org_visibility_orgs', []),
     }

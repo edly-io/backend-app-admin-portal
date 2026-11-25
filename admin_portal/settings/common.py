@@ -39,3 +39,10 @@ def plugin_settings(settings):
     # Usernames excluded from learner counts. ``None`` uses the built-in default
     # set of service/worker accounts (see reporting.constants).
     settings.ADMIN_PORTAL_ANALYTICS_SERVICE_ACCOUNTS = None
+
+    # Must match the service username configured in Studio.
+    settings.ADMIN_PORTAL_SERVICE_USER = 'edl_portal_service'
+    settings.ADMIN_PORTAL_STUDIO_URL = ''
+    settings.ADMIN_PORTAL_STUDIO_TIMEOUT = 10
+    settings.ADMIN_PORTAL_STUDIO_MAX_ATTEMPTS = 3
+    settings.ADMIN_PORTAL_STUDIO_BACKOFF = (1, 2)

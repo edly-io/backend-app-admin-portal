@@ -50,3 +50,24 @@ class ReportingTrendsQuerySerializer(serializers.Serializer):
     months = serializers.IntegerField(
         required=False, min_value=1, max_value=reporting_constants.MAX_TREND_MONTHS,
     )
+
+
+class OrgAccessUpdateSerializer(serializers.Serializer):
+    """Desired organization access."""
+
+    org_admin = serializers.BooleanField()
+    organizations = serializers.ListField(child=serializers.CharField(max_length=255), allow_empty=True, max_length=100)
+    visibility = serializers.BooleanField()
+    confirm_downgrade = serializers.BooleanField(default=False)
+
+    def validate(self, attrs):
+        errors = {}
+        if attrs['visibility'] and not attrs['org_admin']:
+            errors['visibility'] = ['Course visibility needs org admin to be on.']
+        if attrs['org_admin'] and not attrs['organizations']:
+            errors['organizations'] = ['Choose at least one organization.']
+        if not attrs['org_admin'] and attrs['organizations']:
+            errors['organizations'] = ['Organizations must be empty when org admin is off.']
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs

@@ -47,6 +47,7 @@ class UserListGateTests(APITestCase):
 
 class UserListTests(APITestCase):
     def setUp(self):
+        User.objects.filter(username='edl_portal_service').delete()
         self.url = reverse('admin_portal:v1:users')
         self.admin = User.objects.create_user('admin', email='admin@e.com', password='pw')
         self.admin.groups.add(Group.objects.get(name='edl_admin'))
@@ -70,6 +71,7 @@ class UserListTests(APITestCase):
             {
                 'id', 'username', 'email', 'name', 'is_active', 'status', 'date_joined',
                 'invite_sent_at', 'invite_expires_at', 'invite_expired', 'lms_role', 'enrollment_count',
+                'org_admin_orgs', 'org_admin_all_orgs', 'org_visibility_orgs',
             },
         )
         self.assertEqual(row['username'], 'alice')

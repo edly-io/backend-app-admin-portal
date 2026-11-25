@@ -24,13 +24,17 @@ except Exception:  # pragma: no cover - standalone fallback (edx-platform absent
 
 def account_creation_form(data):
     """Build the platform ``AccountCreationForm`` (terms not required for admin-created accounts)."""
-    from openedx.core.djangoapps.user_authn.views.registration_form import AccountCreationForm
+    from openedx.core.djangoapps.user_authn.views.registration_form import (
+        AccountCreationForm,
+    )
     return AccountCreationForm(data=data, tos_required=False)
 
 
 def do_create_account(form):
     """Create User + UserProfile + Registration via the platform helper."""
-    from common.djangoapps.student.helpers import do_create_account as _do_create_account
+    from common.djangoapps.student.helpers import (
+        do_create_account as _do_create_account,
+    )
     return _do_create_account(form)
 
 
@@ -56,10 +60,15 @@ def send_set_password_email(user, request=None):
     from django.utils.http import int_to_base36
     from edx_ace import ace
     from edx_ace.recipient import Recipient
-
-    from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
-    from openedx.core.djangoapps.user_authn.toggles import should_redirect_to_authn_microfrontend
-    from openedx.core.djangoapps.user_authn.views.password_reset import get_user_default_email_params
+    from openedx.core.djangoapps.site_configuration import (
+        helpers as configuration_helpers,
+    )
+    from openedx.core.djangoapps.user_authn.toggles import (
+        should_redirect_to_authn_microfrontend,
+    )
+    from openedx.core.djangoapps.user_authn.views.password_reset import (
+        get_user_default_email_params,
+    )
 
     from .message_types import AccountInvite
 
@@ -181,11 +190,6 @@ def process_enrollment_batch(*, request_user, course_key, action, identifiers,
     """
     import logging
 
-    from django.contrib.auth import get_user_model
-    from django.core.exceptions import ValidationError
-    from django.core.validators import validate_email
-    from django.db import transaction
-
     from common.djangoapps.student.models import (
         ALLOWEDTOENROLL_TO_ENROLLED,
         ALLOWEDTOENROLL_TO_UNENROLLED,
@@ -200,6 +204,10 @@ def process_enrollment_batch(*, request_user, course_key, action, identifiers,
         ManualEnrollmentAudit,
         get_user_by_username_or_email,
     )
+    from django.contrib.auth import get_user_model
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+    from django.db import transaction
     from lms.djangoapps.instructor.enrollment import (
         enroll_email,
         get_email_params,
@@ -360,10 +368,9 @@ def _active_enrollment_count(org=None):
         from lms.djangoapps.courseware.models import StudentModule
     except Exception:  # noqa: BLE001 - courseware absent in this process
         return None
+    from common.djangoapps.student.models import CourseEnrollment
     from django.db import DatabaseError
     from django.db.models import Exists, OuterRef
-
-    from common.djangoapps.student.models import CourseEnrollment
     queryset = CourseEnrollment.objects.filter(is_active=True)
     if org:
         queryset = queryset.filter(course__org=org)
@@ -388,7 +395,6 @@ def reporting_summary_counts(*, this_month, previous_month, now,
     figures differently (e.g. via enrollment in the org's courses).
     """
     from django.db.models import Q
-
     from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
     learners = _learner_queryset(service_accounts, suffixes)
     courses = CourseOverview.objects.all()
@@ -442,7 +448,6 @@ def reporting_registration_month_counts(*, start, service_accounts, suffixes, or
 def reporting_course_lifecycle_counts(*, now, org=None):
     """Mutually exclusive course-run state counts (no_dates/upcoming/running/ended)."""
     from django.db.models import Q
-
     from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
     courses = CourseOverview.objects.all()
     if org:
@@ -459,7 +464,6 @@ def reporting_course_lifecycle_counts(*, now, org=None):
 def reporting_course_rows(*, search, org, ordering, limit, offset, now):
     """One page of annotated course runs. Returns ``{'count': int, 'results': [dict]}``."""
     from django.db.models import Count, Q
-
     from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
     valid_orderings = {
         'display_name', '-display_name', 'start', '-start', 'end', '-end',
@@ -618,3 +622,57 @@ def course_certificates(course_key):
         }
         for cert in certs
     ]
+
+
+def get_service_user():
+    """Return the configured service user, if it exists."""
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    return get_user_model().objects.filter(username=settings.ADMIN_PORTAL_SERVICE_USER).first()
+
+
+def mint_service_jwt(user):
+    """Mint a platform JWT for the service user."""
+    from openedx.core.djangoapps.oauth_dispatch.jwt import create_jwt_for_user
+    return create_jwt_for_user(user)
+
+
+def list_active_organizations():
+    """Return active organizations in short-name order."""
+    from organizations.api import get_organizations
+    return sorted(
+        ({'short_name': item['short_name'], 'name': item['name']}
+         for item in get_organizations() if item.get('active', True)),
+        key=lambda item: item['short_name'],
+    )
+
+
+def org_role_rows(user_ids):
+    """Fetch only organization-wide role rows for a page of users."""
+    try:
+        from common.djangoapps.student.models import CourseAccessRole
+        from opaque_keys.edx.django.models import CourseKeyField
+    except ImportError:
+        return []
+    return list(CourseAccessRole.objects.filter(
+        user_id__in=user_ids, course_id=CourseKeyField.Empty,
+        role__in=['org_course_creator_group', 'course_creator_group', 'instructor', 'data_researcher'],
+    ).values_list('user_id', 'role', 'org'))
+
+
+def set_org_visibility(user, orgs):
+    """Replace both organization-wide visibility roles using platform role classes."""
+    from common.djangoapps.student.roles import OrgDataResearcherRole, OrgInstructorRole
+    rows = org_role_rows([user.id])
+    instructors = {org for _, role, org in rows if org and role == 'instructor'}
+    researchers = {org for _, role, org in rows if org and role == 'data_researcher'}
+    existing = instructors | researchers
+    complete = instructors & researchers
+    desired = set(orgs)
+    for org in sorted(desired):
+        OrgInstructorRole(org=org).add_users(user)
+        OrgDataResearcherRole(org=org).add_users(user)
+    for org in sorted(existing - desired):
+        OrgInstructorRole(org=org).remove_users(user)
+        OrgDataResearcherRole(org=org).remove_users(user)
+    return sorted(desired - complete), sorted(existing - desired)

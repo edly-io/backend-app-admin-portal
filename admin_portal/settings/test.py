@@ -51,3 +51,9 @@ ADMIN_PORTAL_MFE_URL = 'http://apps.testserver/admin-portal/'
 # Reporting defaults (mirror common.plugin_settings).
 ADMIN_PORTAL_REPORTING_CACHE_TTL = 300
 ADMIN_PORTAL_ANALYTICS_SERVICE_ACCOUNTS = None
+
+ADMIN_PORTAL_SERVICE_USER = 'edl_portal_service'
+ADMIN_PORTAL_STUDIO_URL = 'http://studio.testserver'
+ADMIN_PORTAL_STUDIO_TIMEOUT = 10
+ADMIN_PORTAL_STUDIO_MAX_ATTEMPTS = 3
+ADMIN_PORTAL_STUDIO_BACKOFF = (0, 0)

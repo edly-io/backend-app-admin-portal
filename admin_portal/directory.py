@@ -142,7 +142,7 @@ def derive_lms_role(user):
     return 'learner'
 
 
-def serialize_user(user):
+def serialize_user(user, org_access=None):
     """Serialize a user row for the directory list.
 
     ``enrollment_count`` is ``None`` when run standalone (no student app, so
@@ -167,4 +167,7 @@ def serialize_user(user):
         'invite_expired': invite_expired,
         'lms_role': derive_lms_role(user),
         'enrollment_count': getattr(user, 'enrollment_count', None),
+        'org_admin_orgs': (org_access or {}).get('org_admin_orgs', []),
+        'org_admin_all_orgs': (org_access or {}).get('org_admin_all_orgs', False),
+        'org_visibility_orgs': (org_access or {}).get('org_visibility_orgs', []),
     }

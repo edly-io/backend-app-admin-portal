@@ -63,6 +63,12 @@ class UserListTests(APITestCase):
             self.assertIn(key, response.data)
         self.assertEqual(response.data['count'], 3)  # admin + alice + bob
 
+    def test_service_account_is_not_listed(self):
+        User.objects.create_user('edl_portal_service', email='svc@e.com', password='pw', is_staff=True)
+        response = self.client.get(self.url)
+        self.assertEqual(response.data['count'], 3)
+        self.assertNotIn('edl_portal_service', [row['username'] for row in response.data['results']])
+
     def test_result_shape(self):
         response = self.client.get(self.url, {'search': 'alice'})
         row = response.data['results'][0]

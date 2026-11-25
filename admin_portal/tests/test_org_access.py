@@ -23,12 +23,14 @@ def test_service_user_migration_idempotent():
         migration.create_service_user(apps, None)
         user = User.objects.get(username='custom_service')
         assert user.is_staff and user.is_active and not user.is_superuser and not user.has_usable_password()
+        migration.create_service_user(apps, None)
+        assert User.objects.filter(username='custom_service').count() == 1
         user.is_staff = False
         user.save()
-        migration.create_service_user(apps, None)
+        with pytest.raises(RuntimeError):
+            migration.create_service_user(apps, None)
         user.refresh_from_db()
         assert not user.is_staff
-        assert User.objects.filter(username='custom_service').count() == 1
 
 
 @pytest.mark.django_db
@@ -149,6 +151,24 @@ def test_failed_undo_reports_out_of_sync():
     assert error.value.code == 'out_of_sync'
     assert error.value.out_of_sync['studio'] == 'unknown'
     assert EdlAdminAuditLog.objects.filter(detail__outcome='out_of_sync').exists()
+
+
+@pytest.mark.django_db
+def test_out_of_sync_message_names_all_organizations():
+    user = User.objects.create_user('partner')
+    studio = {'state': 'granted', 'all_organizations': True, 'organizations': []}
+    error = org_access._out_of_sync(user, studio)
+    assert 'Run creation is set to: all organizations.' in error.detail
+
+
+@pytest.mark.django_db
+def test_service_user_migration_uses_unique_email():
+    migration = importlib.import_module('admin_portal.migrations.0004_create_portal_service_user')
+    User.objects.filter(username='edl_portal_service').delete()
+    migration.create_service_user(apps, None)
+    service = User.objects.get(username='edl_portal_service')
+    assert service.email == 'edl_portal_service@service.invalid'
+    assert service.is_staff and service.is_active
 
 
 @pytest.mark.django_db

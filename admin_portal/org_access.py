@@ -207,7 +207,13 @@ def set_org_access(*, actor, username, org_admin, organizations, visibility, con
 
 def _out_of_sync(user, studio):
     visibility = get_org_access(user.username)['visibility_orgs']
-    orgs = studio.get('organizations', []) if isinstance(studio, dict) else []
-    message = (f"Access is only partly saved. Run creation is set to: {', '.join(orgs) or ('unknown' if studio == 'unknown' else 'off')}. "
+    if studio == 'unknown':
+        run_creation = 'unknown'
+    elif isinstance(studio, dict) and studio.get('all_organizations'):
+        run_creation = 'all organizations'
+    else:
+        orgs = studio.get('organizations', []) if isinstance(studio, dict) else []
+        run_creation = ', '.join(orgs) or 'off'
+    message = (f"Access is only partly saved. Run creation is set to: {run_creation}. "
                f"Course visibility is set to: {', '.join(visibility) or 'off'}. Please save again or contact support.")
     return OrgAccessError('out_of_sync', message, 500, out_of_sync={'studio': studio, 'lms_visibility_orgs': visibility})

@@ -106,6 +106,10 @@ def _apply_status(queryset, status):
 def list_users(*, search='', status=None):
     """Return a User queryset, newest first, filtered by search term and status."""
     queryset = User.objects.all().order_by('-id')
+    # The portal's own service account is not a person: keep it out of the list and its page counts.
+    service_username = getattr(settings, 'ADMIN_PORTAL_SERVICE_USER', None)
+    if service_username:
+        queryset = queryset.exclude(username=service_username)
     if _HAS_PROFILE:
         queryset = queryset.select_related('profile')
     if _HAS_STANDING:
